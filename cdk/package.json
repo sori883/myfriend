@@ -1,0 +1,54 @@
+{
+  "name": "aws-cdk-template",
+  "version": "0.1.0",
+  "bin": {
+    "aws-cdk-template": "bin/aws-cdk-template.js"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "cdk:prd": "pnpm with-env:prd cdk --context env=prd",
+    "cdk:stg": "pnpm with-env:stg cdk --context env=stg",
+    "cdk:dev": "pnpm with-env:dev cdk --context env=dev",
+    "test:prd": "pnpm with-env:prd jest",
+    "test:stg": "pnpm with-env:stg jest",
+    "test:dev": "pnpm with-env:dev jest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check \"**/*.ts\" --cache",
+    "format:fix": "prettier --write \"**/*.ts\" --cache",
+    "clean": "rm -rf node_modules",
+    "typecheck": "tsc --noEmit",
+    "with-env:prd": "dotenv -e .env.prd --",
+    "with-env:stg": "dotenv -e .env.stg --",
+    "with-env:dev": "dotenv -e .env.dev --"
+  },
+  "dependencies": {
+    "@aws-cdk/aws-bedrock-agentcore-alpha": "2.236.0-alpha.0",
+    "@aws-cdk/aws-bedrock-alpha": "2.237.0-alpha.0",
+    "aws-cdk-lib": "2.236.0",
+    "constructs": "^10.4.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.4",
+    "aws-cdk": "2.1104.0",
+    "dotenv": "^17.2.3",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-awscdk": "^4.0.5",
+    "eslint-plugin-n": "^17.23.2",
+    "jest": "^30.2.0",
+    "prettier": "^3.7.4",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.54.0",
+    "zod": "^4.3.6"
+  }
+}
