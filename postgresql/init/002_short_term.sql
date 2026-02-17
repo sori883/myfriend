@@ -91,9 +91,12 @@ CREATE TABLE entities (
     metadata JSONB DEFAULT '{}'::jsonb,
     first_seen TIMESTAMPTZ DEFAULT NOW(),
     last_seen TIMESTAMPTZ DEFAULT NOW(),
-    mention_count INTEGER DEFAULT 1,
-    UNIQUE(bank_id, LOWER(canonical_name))
+    mention_count INTEGER DEFAULT 1
 );
+
+-- 関数式ベースのユニーク制約（インラインUNIQUEでは不可）
+CREATE UNIQUE INDEX idx_entities_bank_canonical ON entities
+    (bank_id, LOWER(canonical_name));
 
 -- Unit Entities: memory_units <-> entities 中間テーブル
 CREATE TABLE unit_entities (
