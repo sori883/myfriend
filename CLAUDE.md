@@ -1,13 +1,39 @@
 # プロジェクト概要
 
-TanStack Start + Hono RPC + React Query のモノレポ構成。Cloudflare Workers にデプロイ。
+Hindsight 論文ベースの3段階記憶モデルを持つ AI エージェントシステム。AWS Bedrock AgentCore + Strands Agent（Python）で構成。
 
-## パッケージ構成
+## アーキテクチャ
 
-- `apps/web` — TanStack Start フロントエンド + サーバー
-- `packages/api` — Hono API（webのサーバープロセス内で動作。独立サーバーではない）
-- `packages/db` — Drizzle ORM + Turso
-- `packages/auth` — better-auth
+```
+API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (Python)
+                                                                 │
+                                                           Memory Module
+                                                                 │
+                                                     PostgreSQL (pgvector)
+```
+
+## ディレクトリ構成
+
+- `agentcore/` — Strands Agent エントリポイント + 記憶システム（Python 3.14+）
+- `cdk/` — AWS CDK インフラ（TypeScript）
+- `postgresql/` — ローカル開発用 Docker（pgvector/pgvector:pg16）
+- `docs/設計/` — アーキテクチャ設計書・実装タスク
+
+## 記憶システム（3段階）
+
+- **短期記憶（Raw Facts）** — 会話から5W1H事実を抽出、Embedding付きで永続化
+- **中期記憶（Observations）** — Raw Factsの自動統合・パターン検出・鮮度追跡
+- **長期記憶（Mental Models）** — キュレーション済みサマリ、Reflect による深い推論
+
+## 技術スタック
+
+- **Agent**: Strands Agents SDK, Bedrock AgentCore
+- **LLM**: Bedrock Converse API（Claude Haiku 4.5 / Sonnet 4.5）
+- **Embedding**: Bedrock Titan Embed V2（1024次元）
+- **DB**: PostgreSQL 16 + pgvector + pg_trgm
+- **開発DB**: Docker（`postgresql/docker-compose.yml`）
+- **本番DB**: Aurora Serverless v2（商用化フェーズで移行）
+- **IaC**: AWS CDK（TypeScript）
 
 ## 開発フロー
 
@@ -32,9 +58,5 @@ TanStack Start + Hono RPC + React Query のモノレポ構成。Cloudflare Worke
 
 実装後は必ず以下を実行する:
 
-- `pnpm --filter web cf-typegen` 型を生成
-- `pnpm build` 型を生成
 - `code-reviewer` サブエージェントでコードレビュー
-- `pnpm typecheck` で型チェック
-- `pnpm lint` でlint
 - セキュリティに関わるコードは `security-reviewer` サブエージェントでレビュー
