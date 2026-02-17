@@ -1,0 +1,6 @@
+postgresql/data/
+docs
+.venv
+
+.env
+.env.dev
