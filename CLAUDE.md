@@ -46,14 +46,14 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 | 1.1.1 Docker PostgreSQL 環境の拡張 | ✅ 完了 | Dockerfile, docker-compose.yml 修正済み |
 | 1.1.2 DB マイグレーション（短期記憶テーブル） | ✅ 完了 | 001_extensions.sql, 002_short_term.sql 作成済み |
 | 1.1.3 Python DB 接続設定 | ✅ 完了 | memory/db.py, pyproject.toml, .env 更新済み |
-| 1.2.1 Memory Engine コアモジュール | 未着手 | |
-| 1.2.2 LLM ファクト抽出 | 未着手 | |
-| 1.2.3 Embedding 生成 | 未着手 | |
-| 1.2.4 エンティティ抽出・解決 | 未着手 | |
-| 1.2.5 Retain パイプライン | 未着手 | |
-| 1.2.6 Recall パイプライン（基本版） | 未着手 | |
-| 1.2.7 Strands Agent ツール統合 | 未着手 | |
-| 1.3 検証 | 未着手 | Docker起動確認は未実施 |
+| 1.2.1 Memory Engine コアモジュール | ✅ 完了 | memory/engine.py, memory/__init__.py 作成済み |
+| 1.2.2 LLM ファクト抽出 | ✅ 完了 | memory/extraction.py 作成済み（Bedrock Converse, Fact dataclass） |
+| 1.2.3 Embedding 生成 | ✅ 完了 | memory/embedding.py 作成済み（Titan Embed V2, 1024次元） |
+| 1.2.4 エンティティ抽出・解決 | ✅ 完了 | memory/entity.py 作成済み（pg_trgm similarity, 閾値0.6） |
+| 1.2.5 Retain パイプライン | ✅ 完了 | memory/retain.py 作成済み（重複検出含む） |
+| 1.2.6 Recall パイプライン（基本版） | ✅ 完了 | memory/recall.py 作成済み（セマンティック+BM25, RRF融合） |
+| 1.2.7 Strands Agent ツール統合 | ✅ 完了 | main.py 修正済み（remember/recall_memories, bank_idクロージャ固定） |
+| 1.3 検証 | ✅ 完了 | 全10項目通過。test_script/ にテストスクリプト3本 |
 
 ### Phase 2: 中期記憶
 
