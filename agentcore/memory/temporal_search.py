@@ -72,7 +72,8 @@ async def temporal_search(
         for row in entry_rows:
             uid = str(row["id"])
             best = _resolve_best_date(
-                row["occurred_start"], row["occurred_end"], row["mentioned_at"]
+                row["occurred_start"], row["occurred_end"], row["mentioned_at"],
+                row["event_date"],
             )
             proximity = _compute_temporal_proximity(best, mid_date, total_days) if best else 0.5
             scored[uid] = proximity
@@ -109,6 +110,7 @@ def _resolve_best_date(
     occurred_start: datetime | None,
     occurred_end: datetime | None,
     mentioned_at: datetime | None,
+    event_date: datetime | None = None,
 ) -> datetime | None:
     """スコアリング用の最適日時を解決する
 
@@ -117,6 +119,7 @@ def _resolve_best_date(
     2. occurred_start
     3. occurred_end
     4. mentioned_at
+    5. event_date（Phase 1 互換）
     """
     if occurred_start is not None and occurred_end is not None:
         start = _ensure_utc(occurred_start)
@@ -128,6 +131,8 @@ def _resolve_best_date(
         return _ensure_utc(occurred_end)
     if mentioned_at is not None:
         return _ensure_utc(mentioned_at)
+    if event_date is not None:
+        return _ensure_utc(event_date)
     return None
 
 
@@ -162,7 +167,7 @@ async def _find_temporal_entry_points(
     """時間範囲内のユニットを Embedding 関連性フィルタ付きで取得する"""
     return await conn.fetch(
         """
-        SELECT id, occurred_start, occurred_end, mentioned_at,
+        SELECT id, occurred_start, occurred_end, mentioned_at, event_date,
                1 - (embedding <=> $1::vector) AS similarity
         FROM memory_units
         WHERE bank_id = $2::uuid
@@ -174,9 +179,10 @@ async def _find_temporal_entry_points(
               OR (mentioned_at IS NOT NULL AND mentioned_at BETWEEN $3 AND $4)
               OR (occurred_start IS NOT NULL AND occurred_start BETWEEN $3 AND $4)
               OR (occurred_end IS NOT NULL AND occurred_end BETWEEN $3 AND $4)
+              OR (event_date IS NOT NULL AND event_date BETWEEN $3 AND $4)
           )
           AND (1 - (embedding <=> $1::vector)) >= $5
-        ORDER BY COALESCE(occurred_start, mentioned_at, occurred_end) DESC
+        ORDER BY COALESCE(occurred_start, occurred_end, mentioned_at, event_date) DESC
         LIMIT $6
         """,
         query_embedding,
@@ -212,7 +218,7 @@ async def _expand_through_links(
     rows = await conn.fetch(
         """
         SELECT mu.id, mu.occurred_start, mu.occurred_end, mu.mentioned_at,
-               ml.weight, ml.link_type, ml.from_unit_id,
+               mu.event_date, ml.weight, ml.link_type, ml.from_unit_id,
                1 - (mu.embedding <=> $1::vector) AS similarity
         FROM memory_links ml
         JOIN memory_units mu ON ml.to_unit_id = mu.id
@@ -247,7 +253,8 @@ async def _expand_through_links(
 
         # 隣接ノード自身の時間的近接度
         best = _resolve_best_date(
-            row["occurred_start"], row["occurred_end"], row["mentioned_at"]
+            row["occurred_start"], row["occurred_end"], row["mentioned_at"],
+            row["event_date"],
         )
         neighbor_proximity = (
             _compute_temporal_proximity(best, mid_date, total_days) if best else 0.0

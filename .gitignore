@@ -1,6 +1,9 @@
 postgresql/data/
 docs
 .venv
+__pycache__
+cdk.out
+cdk.context.json
 
 .env
 .env.dev
