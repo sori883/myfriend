@@ -5,6 +5,7 @@ import asyncpg
 from memory.db import close_pool, get_pool
 from memory.retain import retain as _retain
 from memory.recall import recall as _recall
+from memory.scheduler import ConsolidationScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -13,18 +14,26 @@ class MemoryEngine:
     """記憶システムのコアエンジン
 
     DB接続プールのライフサイクル管理と、retain/recall の公開インターフェースを提供する。
+    Consolidation スケジューラーのライフサイクルも管理する。
     """
 
     def __init__(self) -> None:
         self._pool: asyncpg.Pool | None = None
+        self._scheduler: ConsolidationScheduler | None = None
 
     async def initialize(self) -> None:
-        """DB接続プールを初期化する"""
+        """DB接続プールを初期化し、Consolidation スケジューラーを開始する"""
         self._pool = await get_pool()
+        if self._scheduler is None:
+            self._scheduler = ConsolidationScheduler(self._pool)
+            await self._scheduler.start()
         logger.info("MemoryEngine initialized")
 
     async def close(self) -> None:
         """リソースをクリーンアップする"""
+        if self._scheduler is not None:
+            await self._scheduler.stop()
+            self._scheduler = None
         await close_pool()
         self._pool = None
         logger.info("MemoryEngine closed")
@@ -72,3 +81,14 @@ class MemoryEngine:
         """
         pool = await self._ensure_pool()
         return await _recall(pool, bank_id, query, budget)
+
+    async def trigger_consolidation(self) -> dict:
+        """Consolidation を手動トリガーする（開発・デバッグ用）
+
+        Returns:
+            Consolidation 実行結果
+        """
+        await self._ensure_pool()
+        if self._scheduler is None:
+            raise RuntimeError("Consolidation scheduler is not initialized")
+        return await self._scheduler.trigger()
