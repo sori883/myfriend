@@ -64,8 +64,8 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 
 | タスク | ステータス |
 |---|---|
-| 2.1.1 DB マイグレーション（中期記憶テーブル） | 未着手 |
-| 2.1.2 ローカル Consolidation スケジューラー | 未着手 |
+| 2.1.1 DB マイグレーション（中期記憶テーブル） | ✅ 完了 |
+| 2.1.2 ローカル Consolidation スケジューラー | ✅ 完了 |
 | 2.2.1 Consolidation Worker コアロジック | 未着手 |
 | 2.2.2 鮮度追跡 | 未着手 |
 | 2.3.1 グラフリンク構築 | 未着手 |

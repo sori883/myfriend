@@ -33,3 +33,21 @@
 - MEDIUM: conversation ファクトの重複チェック追加
 - MEDIUM: Embedding並列数制限（セマフォ5）
 - MEDIUM: プロンプトインジェクション対策（区切りマーカー）
+
+# Phase 2.1 ローカルインフラ実装完了
+
+## 実装済みファイル
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `postgresql/init/003_mid_term.sql` | ~100行 | 中期記憶テーブル + インデックス |
+| `agentcore/memory/scheduler.py` | ~183行 | Consolidation スケジューラー（asyncio + CLI） |
+| `agentcore/memory/engine.py` | ~95行 | MemoryEngine（スケジューラー統合済み） |
+
+## 設計上の重要な決定
+
+1. スケジューラー: asyncio.create_task でバックグラウンド実行
+2. MemoryEngine 統合: initialize() で起動、close() で逆順停止
+3. 多重起動防止: initialize() で scheduler is None ガード
+4. CLI: scheduler.py の __main__ で単発/連続実行モード
+5. _execute_consolidation: Phase 2.2.1 まではスタブ（COUNT のみ）
