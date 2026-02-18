@@ -231,7 +231,8 @@ async def retain(
                 # エンティティ解決 + リンク
                 if fact.who:
                     entities = await resolve_entities(
-                        conn, bank_id, list(fact.who)
+                        conn, bank_id, list(fact.who),
+                        event_date=fact.event_date,
                     )
                     entity_ids = [e.entity_id for e in entities]
                     await _insert_unit_entities(conn, unit_id, entity_ids)

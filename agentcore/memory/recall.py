@@ -58,6 +58,22 @@ MAX_RELATIVE_DAYS = 3650
 
 _FACT_TYPES = ["world", "experience", "observation"]
 
+# BM25 キーワード抽出用定数
+# 複合助詞・文末表現（除去対象、長い順にソート）
+# NOTE: 短い動詞ステム（ある、いる、する等）は複合語を壊すため除外
+_COMPOUND_PARTICLES = sorted([
+    "について", "に関して", "に関する", "に対して", "に対する",
+    "のこと", "ということ", "といった", "のような", "みたいな",
+    "における", "としての", "によると", "によって",
+    "ですか", "ですが", "ですね", "ですよ", "でした",
+    "ました", "ません", "ている", "ていた", "てください",
+    "しました", "しています", "してた", "してる",
+    "ってなに", "ってどう", "って何",
+    "だった", "だっけ", "かな", "かも",
+    "知って", "教えて", "覚えて", "思い出して",
+], key=len, reverse=True)
+_PARTICLE_SPLIT_PATTERN = re.compile(r"[はがのをにでともやへか\s]+")
+
 
 # ---------- データ構造 ----------
 
@@ -127,22 +143,44 @@ async def _bm25_search(
     bank_id: str,
     query: str,
 ) -> list[asyncpg.Record]:
-    """PARTITION BY fact_type でバランスされた全文検索（pg_bigm）"""
+    """PARTITION BY fact_type でバランスされた全文検索（pg_bigm）
+
+    クエリから日本語助詞ベースでキーワードを抽出し、
+    各キーワードの OR で LIKE 検索、MAX(bigm_similarity) でスコアリング。
+    """
+    keywords = _extract_keywords(query)
+    if not keywords:
+        if len(query) <= 20:
+            keywords = [query]
+        else:
+            logger.debug("BM25 skipped: no keywords extracted from query: %s", query[:50])
+            return []
+    logger.debug("BM25 keywords: %s", keywords)
+
     async with pool.acquire() as conn:
         return await conn.fetch(
             """
-            WITH ranked AS (
+            WITH scored AS (
                 SELECT id, text, context, fact_type, fact_kind, event_date,
                        created_at, occurred_start, mentioned_at,
-                       bigm_similarity(text, $1) AS score,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY fact_type
-                           ORDER BY bigm_similarity(text, $1) DESC
-                       ) AS rn
-                FROM memory_units
-                WHERE bank_id = $2::uuid
-                  AND fact_type = ANY($3::text[])
-                  AND (text LIKE likequery($1) OR context LIKE likequery($1))
+                       (SELECT MAX(GREATEST(
+                           bigm_similarity(mu.text, kw),
+                           bigm_similarity(COALESCE(mu.context, ''), kw)
+                       )) FROM unnest($1::text[]) AS kw) AS score
+                FROM memory_units mu
+                WHERE mu.bank_id = $2::uuid
+                  AND mu.fact_type = ANY($3::text[])
+                  AND EXISTS (
+                      SELECT 1 FROM unnest($1::text[]) AS kw
+                      WHERE mu.text LIKE likequery(kw)
+                         OR mu.context LIKE likequery(kw)
+                  )
+            ),
+            ranked AS (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY fact_type ORDER BY score DESC
+                ) AS rn
+                FROM scored
             )
             SELECT id, text, context, fact_type, fact_kind, event_date,
                    created_at, occurred_start, mentioned_at, score
@@ -150,7 +188,7 @@ async def _bm25_search(
             WHERE rn <= $4
             ORDER BY score DESC
             """,
-            query,
+            keywords,
             bank_id,
             _FACT_TYPES,
             PER_TYPE_LIMIT,
@@ -166,12 +204,19 @@ def _extract_graph_seeds(
     """セマンティック結果 top-5 (cosine >= 0.5) を SeedNode に変換する"""
     seeds: list[SeedNode] = []
     for row in semantic_results:
-        if row["similarity"] >= GRAPH_SEED_SIMILARITY_THRESHOLD:
+        sim = float(row["similarity"])
+        if sim >= GRAPH_SEED_SIMILARITY_THRESHOLD:
             seeds.append(
-                SeedNode(node_id=str(row["id"]), score=float(row["similarity"]))
+                SeedNode(node_id=str(row["id"]), score=sim)
             )
             if len(seeds) >= GRAPH_SEED_MAX:
                 break
+    if semantic_results:
+        top_sim = float(semantic_results[0]["similarity"])
+        logger.info(
+            "Graph seed extraction: top_similarity=%.4f, threshold=%.2f, seeds=%d",
+            top_sim, GRAPH_SEED_SIMILARITY_THRESHOLD, len(seeds),
+        )
     return seeds
 
 
@@ -186,44 +231,104 @@ def _now_utc() -> datetime:
 
 
 def _build_relative_patterns() -> list[tuple[re.Pattern, callable]]:
-    """相対的時間表現の正規表現パターンを構築する"""
+    """相対的時間表現の正規表現パターンを構築する
+
+    先月/去年/来月/来年はカレンダー境界を使用する。
+    先週/来週はローリングウィンドウ（7日）を維持
+    （日本語の「先週」は厳密なカレンダー週を意味しないため）。
+    """
     patterns = []
 
-    def _yesterday(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=1), today)
+    def _start_of_today() -> datetime:
+        return _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    def _today(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today, today + timedelta(days=1))
+    # --- 過去 ---
+    def _yesterday(_m):
+        t = _start_of_today()
+        return (t - timedelta(days=1), t)
+
+    def _day_before_yesterday(_m):
+        t = _start_of_today()
+        return (t - timedelta(days=2), t - timedelta(days=1))
 
     def _last_week(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=7), today)
+        t = _start_of_today()
+        return (t - timedelta(days=7), t)
 
     def _last_month(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=30), today)
+        t = _start_of_today()
+        first_of_this_month = t.replace(day=1)
+        first_of_prev_month = (first_of_this_month - timedelta(days=1)).replace(day=1)
+        return (first_of_prev_month, first_of_this_month)
 
     def _last_year(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=365), today)
+        t = _start_of_today()
+        return (datetime(t.year - 1, 1, 1, tzinfo=UTC), datetime(t.year, 1, 1, tzinfo=UTC))
 
     def _n_days_ago(m):
         n = min(int(m.group(1)), MAX_RELATIVE_DAYS)
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=n), today)
+        t = _start_of_today()
+        return (t - timedelta(days=n), t)
 
     def _n_weeks_ago(m):
         n = min(int(m.group(1)), MAX_RELATIVE_DAYS // 7)
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(weeks=n), today)
+        t = _start_of_today()
+        return (t - timedelta(weeks=n), t)
 
     def _n_months_ago(m):
         n = min(int(m.group(1)), MAX_RELATIVE_DAYS // 30)
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=30 * n), today)
+        t = _start_of_today()
+        return (t - timedelta(days=30 * n), t)
 
+    # --- 未来 ---
+    def _tomorrow(_m):
+        t = _start_of_today()
+        return (t + timedelta(days=1), t + timedelta(days=2))
+
+    def _day_after_tomorrow(_m):
+        t = _start_of_today()
+        return (t + timedelta(days=2), t + timedelta(days=3))
+
+    def _next_week(_m):
+        t = _start_of_today()
+        return (t + timedelta(days=1), t + timedelta(days=8))
+
+    def _next_month(_m):
+        t = _start_of_today()
+        ny, nm = (t.year + 1, 1) if t.month == 12 else (t.year, t.month + 1)
+        first_of_next = datetime(ny, nm, 1, tzinfo=UTC)
+        ny2, nm2 = (ny + 1, 1) if nm == 12 else (ny, nm + 1)
+        first_after_next = datetime(ny2, nm2, 1, tzinfo=UTC)
+        return (first_of_next, first_after_next)
+
+    def _next_year(_m):
+        t = _start_of_today()
+        return (datetime(t.year + 1, 1, 1, tzinfo=UTC), datetime(t.year + 2, 1, 1, tzinfo=UTC))
+
+    def _n_days_later(m):
+        n = min(int(m.group(1)), MAX_RELATIVE_DAYS)
+        t = _start_of_today()
+        target = t + timedelta(days=n)
+        return (target, target + timedelta(days=1))
+
+    def _n_weeks_later(m):
+        n = min(int(m.group(1)), MAX_RELATIVE_DAYS // 7)
+        t = _start_of_today()
+        target = t + timedelta(weeks=n)
+        return (target, target + timedelta(weeks=1))
+
+    def _n_months_later(m):
+        n = min(int(m.group(1)), MAX_RELATIVE_DAYS // 30)
+        t = _start_of_today()
+        target = t + timedelta(days=30 * n)
+        return (target, target + timedelta(days=30))
+
+    # --- 今日 ---
+    def _today(_m):
+        t = _start_of_today()
+        return (t, t + timedelta(days=1))
+
+    # --- 絶対日付 ---
     def _year_month(m):
         year = int(m.group(1))
         month = int(m.group(2))
@@ -236,21 +341,65 @@ def _build_relative_patterns() -> list[tuple[re.Pattern, callable]]:
             end = datetime(year, month + 1, 1, tzinfo=UTC)
         return (start, end)
 
-    def _day_before_yesterday(_m):
-        today = _now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        return (today - timedelta(days=2), today - timedelta(days=1))
+    def _year_only(m):
+        year = int(m.group(1))
+        if not (1900 <= year <= 2100):
+            return None
+        return (datetime(year, 1, 1, tzinfo=UTC), datetime(year + 1, 1, 1, tzinfo=UTC))
+
+    # --- 曜日 ---
+    _weekday_map = {
+        "月曜日": 0, "月曜": 0,
+        "火曜日": 1, "火曜": 1,
+        "水曜日": 2, "水曜": 2,
+        "木曜日": 3, "木曜": 3,
+        "金曜日": 4, "金曜": 4,
+        "土曜日": 5, "土曜": 5,
+        "日曜日": 6, "日曜": 6,
+    }
+
+    def _last_weekday(m):
+        target = _weekday_map.get(m.group(1))
+        if target is None:
+            return None
+        t = _start_of_today()
+        # 先週の月曜日（weekday=0）を基準に、target 曜日を加算
+        days_since_monday = t.weekday()
+        last_week_monday = t - timedelta(days=days_since_monday + 7)
+        d = last_week_monday + timedelta(days=target)
+        return (d, d + timedelta(days=1))
 
     # 優先度順（より具体的なパターンを先に）
+    # 過去: N日/週/月前
     patterns.append((re.compile(r"(\d+)\s*日前"), _n_days_ago))
     patterns.append((re.compile(r"(\d+)\s*週間前"), _n_weeks_ago))
     patterns.append((re.compile(r"(\d+)\s*[かヶケ]月前"), _n_months_ago))
+    # 未来: N日/週/月後
+    patterns.append((re.compile(r"(\d+)\s*日後"), _n_days_later))
+    patterns.append((re.compile(r"(\d+)\s*週間後"), _n_weeks_later))
+    patterns.append((re.compile(r"(\d+)\s*[かヶケ]月後"), _n_months_later))
+    # 絶対日付（年月 → 年のみ の順）
     patterns.append((re.compile(r"(\d{4})年(\d{1,2})月"), _year_month))
+    patterns.append((re.compile(r"(\d{4})年(?!\d{1,2}月)"), _year_only))
+    # 過去: 相対表現
     patterns.append((re.compile(r"おととい|一昨日"), _day_before_yesterday))
     patterns.append((re.compile(r"昨日|きのう"), _yesterday))
-    patterns.append((re.compile(r"今日|きょう"), _today))
+    # 曜日パターン（先週より前に配置して「先週の月曜日」を正しくマッチ）
+    patterns.append((
+        re.compile(r"(?:先週|前)の(月曜日?|火曜日?|水曜日?|木曜日?|金曜日?|土曜日?|日曜日?)"),
+        _last_weekday,
+    ))
     patterns.append((re.compile(r"先週"), _last_week))
     patterns.append((re.compile(r"先月"), _last_month))
     patterns.append((re.compile(r"去年|昨年"), _last_year))
+    # 未来: 相対表現
+    patterns.append((re.compile(r"明後日|あさって"), _day_after_tomorrow))
+    patterns.append((re.compile(r"明日|あした"), _tomorrow))
+    patterns.append((re.compile(r"来週"), _next_week))
+    patterns.append((re.compile(r"来月"), _next_month))
+    patterns.append((re.compile(r"来年"), _next_year))
+    # 今日
+    patterns.append((re.compile(r"今日|きょう"), _today))
 
     return patterns
 
@@ -270,6 +419,29 @@ def _extract_time_range(query: str) -> tuple[datetime, datetime] | None:
             if result is not None:
                 return result
     return None
+
+
+# ---------- BM25 キーワード抽出 ----------
+
+
+def _extract_keywords(query: str) -> list[str]:
+    """クエリから BM25 検索用キーワードを抽出する（日本語助詞ベース分割）
+
+    複合助詞の除去 → 単一助詞で分割 → 短トークン除去。外部 NLP 依存なし。
+    """
+    cleaned = query
+    for cp in _COMPOUND_PARTICLES:
+        cleaned = cleaned.replace(cp, " ")
+    tokens = _PARTICLE_SPLIT_PATTERN.split(cleaned)
+    seen: set[str] = set()
+    keywords: list[str] = []
+    for token in tokens:
+        token = token.strip()
+        if len(token) < 2 or token in seen:
+            continue
+        seen.add(token)
+        keywords.append(token)
+    return keywords
 
 
 # ---------- graph/temporal 結果の詳細取得 ----------
@@ -378,7 +550,7 @@ async def _rerank_results(
         return []
 
     documents = [
-        _build_rerank_document(c.text, c.context, c.occurred_start)
+        build_rerank_document(c.text, c.context, c.occurred_start)
         for c in candidates
     ]
 

@@ -75,6 +75,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("strands.agent").setLevel(logging.DEBUG)
     logging.getLogger("strands.models").setLevel(logging.DEBUG)
+    logging.getLogger("memory").setLevel(logging.DEBUG)
 
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_post("/invoke", handle_invoke)
