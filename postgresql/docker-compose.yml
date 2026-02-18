@@ -17,3 +17,42 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass:ro
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  jupyter:
+    image: quay.io/jupyter/scipy-notebook:latest
+    user: root
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      GRANT_SUDO: "yes"
+      NB_USER: jovyan
+    volumes:
+      - ./jupyter/requirements.txt:/tmp/requirements.txt:ro
+      - ./jupyter/matplotlibrc:/home/jovyan/.config/matplotlib/matplotlibrc:ro
+      - ./jupyter/work:/home/jovyan/work
+    command: bash -c "sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk >/dev/null 2>&1 && rm -rf ~/.cache/matplotlib && pip install --quiet -r /tmp/requirements.txt && start-notebook.sh --NotebookApp.token=myfriend"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgadmin_data:

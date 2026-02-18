@@ -55,13 +55,8 @@ CREATE TABLE memory_units (
     occurred_end TIMESTAMPTZ,
     mentioned_at TIMESTAMPTZ,
 
-    -- Full-text search (auto-generated)
-    -- TODO: 日本語対応が必要な場合は pg_bigm / pgroonga を検討。
-    -- 現在は english トークナイザー。セマンティック検索(Embedding)がメインのため初期は許容。
-    search_vector tsvector GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', COALESCE(text, '')), 'A') ||
-        setweight(to_tsvector('english', COALESCE(context, '')), 'B')
-    ) STORED,
+    -- Full-text search: pg_bigm（日本語 bi-gram 対応）
+    -- text, context カラムに直接 GIN bigm インデックスを作成（下記 Indexes セクション参照）
 
     -- Observation-specific
     proof_count INTEGER DEFAULT 0,
@@ -125,9 +120,11 @@ CREATE INDEX idx_memory_units_embedding_experience ON memory_units
     WITH (m = 16, ef_construction = 256)
     WHERE fact_type = 'experience' AND embedding IS NOT NULL;
 
--- GIN Index（全文検索）
-CREATE INDEX idx_memory_units_search_vector ON memory_units
-    USING gin (search_vector);
+-- GIN Index（pg_bigm 全文検索 — 日本語対応）
+CREATE INDEX idx_memory_units_text_bigm ON memory_units
+    USING gin (text gin_bigm_ops);
+CREATE INDEX idx_memory_units_context_bigm ON memory_units
+    USING gin (context gin_bigm_ops);
 
 -- B-tree Composite: 主検索パターン
 CREATE INDEX idx_memory_units_bank_type_date ON memory_units

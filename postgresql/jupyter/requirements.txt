@@ -1,0 +1,4 @@
+pgvector
+psycopg2-binary
+networkx
+pyvis
