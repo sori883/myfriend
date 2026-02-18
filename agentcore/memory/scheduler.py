@@ -10,6 +10,7 @@ MemoryEngine 起動時にバックグラウンドタスクとして開始し、
 import asyncio
 import logging
 import os
+import time
 from datetime import datetime, timezone
 
 import asyncpg
@@ -91,37 +92,43 @@ class ConsolidationScheduler:
     async def _execute_consolidation(self) -> dict:
         """1回分の Consolidation を実行する
 
-        Phase 2.2.1 で実装予定。現在は未統合 Fact 数をカウントするスタブ。
+        全 bank を列挙し、各 bank に対して consolidation を実行する。
 
         Returns:
             実行結果の辞書
         """
-        started_at = datetime.now(timezone.utc)
+        from memory.consolidation import consolidate
+
+        started_at = time.monotonic()
 
         async with self._pool.acquire() as conn:
-            # NOTE: 全バンク横断でカウント（Phase 2.2.1 で bank_id 単位の処理に変更予定）
-            unconsolidated_count = await conn.fetchval(
-                """
-                SELECT COUNT(*)
-                FROM memory_units
-                WHERE consolidated_at IS NULL
-                  AND fact_type IN ('world', 'experience')
-                """
-            )
+            bank_rows = await conn.fetch("SELECT id FROM banks")
 
-        elapsed_ms = (
-            datetime.now(timezone.utc) - started_at
-        ).total_seconds() * 1000
+        results = {}
+        total_processed = 0
+        for row in bank_rows:
+            bank_id = str(row["id"])
+            try:
+                result = await consolidate(self._pool, bank_id)
+                results[bank_id] = result
+                total_processed += result.get("processed", 0)
+            except Exception:
+                logger.exception("Consolidation failed for bank %s", bank_id)
+                results[bank_id] = {"error": True, "processed": 0}
+
+        elapsed_ms = (time.monotonic() - started_at) * 1000
 
         logger.info(
-            "Consolidation stub: %d unconsolidated facts found (%.0fms)",
-            unconsolidated_count,
+            "Consolidation: %d banks processed, %d facts consolidated (%.0fms)",
+            len(bank_rows),
+            total_processed,
             elapsed_ms,
         )
 
         return {
-            "unconsolidated_count": unconsolidated_count,
-            "processed": 0,
+            "banks_processed": len(bank_rows),
+            "total_processed": total_processed,
+            "results": results,
             "elapsed_ms": round(elapsed_ms),
         }
 

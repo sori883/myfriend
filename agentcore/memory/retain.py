@@ -13,6 +13,7 @@ import asyncpg
 from memory.embedding import generate_embeddings
 from memory.entity import resolve_entities
 from memory.extraction import Fact, extract_facts
+from memory.graph import build_links_for_units
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +199,7 @@ async def retain(
 
     # 3-4. 重複チェック + DB 保存（トランザクション内）
     stored_ids = []
+    stored_embeddings: list[list[float]] = []
     duplicate_count = 0
 
     async with pool.acquire() as conn:
@@ -235,13 +237,17 @@ async def retain(
                     await _insert_unit_entities(conn, unit_id, entity_ids)
 
                 stored_ids.append(unit_id)
+                stored_embeddings.append(embedding)
 
-    # 5. Consolidation ジョブキュー（Phase 2 で実装）
+    # 5. グラフリンク構築（メイントランザクション外）
+    link_stats: dict = {}
     if stored_ids:
-        logger.info(
-            "Consolidation job queued for %d new facts (stub - Phase 2)",
-            len(stored_ids),
-        )
+        try:
+            link_stats = await build_links_for_units(
+                pool, bank_id, stored_ids, stored_embeddings
+            )
+        except Exception:
+            logger.exception("Failed to build graph links (non-fatal)")
 
     logger.info(
         "Retain complete: stored=%d, duplicates=%d",
@@ -253,4 +259,5 @@ async def retain(
         "stored": len(stored_ids),
         "duplicates": duplicate_count,
         "fact_ids": stored_ids,
+        "links": link_stats,
     }

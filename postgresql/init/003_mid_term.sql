@@ -13,9 +13,18 @@ CREATE TABLE memory_links (
     )),
     entity_id UUID REFERENCES entities(id) ON DELETE SET NULL,
     weight FLOAT NOT NULL DEFAULT 1.0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(from_unit_id, to_unit_id, link_type, entity_id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    -- NOTE: UNIQUE 制約は entity_id が NULL の場合に重複を防止できない
+    -- (PostgreSQL は NULL を distinct として扱うため)
+    -- → 以下の functional unique index で代替する
 );
+
+-- リンク重複防止（COALESCE で NULL entity_id をセンチネル UUID に変換）
+CREATE UNIQUE INDEX idx_memory_links_unique_coalesce
+    ON memory_links (
+        from_unit_id, to_unit_id, link_type,
+        COALESCE(entity_id, '00000000-0000-0000-0000-000000000000'::uuid)
+    );
 
 -- Entity Co-occurrences: 共起頻度キャッシュ
 CREATE TABLE entity_cooccurrences (
@@ -99,3 +108,13 @@ CREATE INDEX idx_memory_units_tags ON memory_units USING gin (tags);
 
 -- NOTE: async_operations は updated_at を持たない
 -- （status 変更は started_at / completed_at で追跡する）
+
+-- ==========================================================
+-- 鮮度追跡 (Phase 2.2.2)
+-- ==========================================================
+
+-- Observation の鮮度ステータス
+ALTER TABLE memory_units ADD COLUMN IF NOT EXISTS
+    freshness_status TEXT CHECK (freshness_status IN (
+        'new', 'strengthening', 'stable', 'weakening', 'stale'
+    ));

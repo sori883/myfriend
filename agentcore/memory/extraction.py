@@ -122,7 +122,7 @@ def _parse_fact(raw: dict) -> Fact:
     )
 
 
-def _extract_json_array(text: str) -> list[dict]:
+def extract_json_array(text: str) -> list[dict]:
     """LLM レスポンスから JSON 配列を安全に抽出する"""
     text = text.strip()
 
@@ -183,7 +183,7 @@ def _call_converse(content: str, context: str) -> list[dict]:
     )
 
     output_text = response["output"]["message"]["content"][0]["text"]
-    return _extract_json_array(output_text)
+    return extract_json_array(output_text)
 
 
 async def extract_facts(content: str, context: str = "") -> list[Fact]:
