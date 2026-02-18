@@ -22,7 +22,7 @@ BUDGETS = {
 
 RRF_K = 60
 
-SEMANTIC_SIMILARITY_THRESHOLD = 0.3
+SEMANTIC_SIMILARITY_THRESHOLD = 0.1
 
 # トークン推定: 英語 ~4文字/トークン、日本語混在 ~1.5文字/トークン、中間値 3
 CHARS_PER_TOKEN = 3
@@ -71,16 +71,16 @@ async def _bm25_search(
     bank_id: str,
     query: str,
 ) -> list[asyncpg.Record]:
-    """BM25 検索（tsvector + GIN）"""
+    """全文検索（pg_bigm bi-gram マッチング）"""
     async with pool.acquire() as conn:
         return await conn.fetch(
             """
             SELECT id, text, context, fact_type, fact_kind, event_date,
-                   ts_rank_cd(search_vector, websearch_to_tsquery('english', $1)) AS score
+                   bigm_similarity(text, $1) AS score
             FROM memory_units
             WHERE bank_id = $2::uuid
               AND fact_type IN ('world', 'experience')
-              AND search_vector @@ websearch_to_tsquery('english', $1)
+              AND (text LIKE '%' || $1 || '%' OR context LIKE '%' || $1 || '%')
             ORDER BY score DESC
             LIMIT 100
             """,

@@ -5,6 +5,7 @@
 """
 
 import logging
+import uuid as _uuid
 from datetime import timedelta
 
 import asyncpg
@@ -201,6 +202,18 @@ async def retain(
 
     async with pool.acquire() as conn:
         async with conn.transaction():
+            # bank が未登録なら自動作成（ローカル開発用途を含む）
+            bank_uuid = _uuid.UUID(bank_id)
+            await conn.execute(
+                """
+                INSERT INTO banks (id, name)
+                VALUES ($1, $2)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                bank_uuid,
+                f"auto-{bank_id[:8]}",
+            )
+
             for fact, embedding in zip(facts, embeddings, strict=True):
                 # 重複チェック
                 is_dup = await _check_duplicate(conn, bank_id, embedding, fact)

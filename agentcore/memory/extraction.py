@@ -25,35 +25,35 @@ ALLOWED_FACT_KINDS = frozenset({"event", "conversation"})
 ALLOWED_FACT_TYPES = frozenset({"world", "experience"})
 
 SYSTEM_PROMPT = """\
-You are a fact extraction engine. Your task is to extract structured facts from conversation text.
+あなたはファクト抽出エンジンです。会話テキストから構造化された事実を抽出してください。
 
-Rules:
-- Extract 2 to 5 narrative facts from the given text.
-- Each fact must be a complete, self-contained statement.
-- Classify each fact:
-  - fact_kind: "event" (has a specific date/time) or "conversation" (ongoing state/preference)
-  - fact_type: "world" (external facts about people/things) or "experience" (agent's own experience)
-- Extract 5W1H structure for each fact:
-  - what: What happened or what is the state
-  - who: List of people/entities involved (empty list if none)
-  - when_description: When it happened (natural language)
-  - where_description: Where it happened (null if unknown)
-  - why_description: Why it is important or the context
-- For temporal normalization:
-  - Convert relative time expressions to absolute dates based on the current date provided.
-  - "yesterday" -> actual date, "last week" -> approximate date, "3 days ago" -> actual date
-  - If event_date can be determined, provide it in ISO 8601 format.
-  - For ongoing states (conversation kind), event_date should be null.
-  - occurred_start/occurred_end: For events spanning a time range.
+ルール:
+- テキストから2〜5個の事実を抽出する。
+- 各事実は完全で自己完結した日本語の文であること。
+- 各事実を分類する:
+  - fact_kind: "event"（特定の日時がある出来事）または "conversation"（継続的な状態・好み）
+  - fact_type: "world"（人や物に関する外部的事実）または "experience"（エージェント自身の体験）
+- 各事実に対して5W1H構造を抽出する:
+  - what: 何が起きたか、またはどういう状態か
+  - who: 関係する人物・エンティティのリスト（なければ空リスト）
+  - when_description: いつ起きたか（自然言語）
+  - where_description: どこで起きたか（不明ならnull）
+  - why_description: なぜ重要か、その背景
+- 時間の正規化:
+  - 相対的な時間表現は、提供された現在日時を基準に絶対日付に変換する。
+  - 「昨日」→実際の日付、「先週」→おおよその日付、「3日前」→実際の日付
+  - event_dateが特定できる場合はISO 8601形式で記述する。
+  - 継続的な状態（conversationタイプ）の場合、event_dateはnullにする。
+  - occurred_start/occurred_end: 期間がある出来事の場合に使用。
 
-Return a JSON array of facts. Each fact must have this exact structure:
+JSON配列を返すこと。各事実は以下の構造に従うこと:
 {
-  "text": "narrative statement",
-  "what": "what happened",
-  "who": ["person1", "person2"],
-  "when_description": "when it happened",
-  "where_description": "where it happened or null",
-  "why_description": "why it matters or null",
+  "text": "日本語の事実文",
+  "what": "何が起きたか",
+  "who": ["人物1", "人物2"],
+  "when_description": "いつ起きたか",
+  "where_description": "どこで起きたか or null",
+  "why_description": "なぜ重要か or null",
   "event_date": "2024-06-15T00:00:00Z or null",
   "occurred_start": "ISO 8601 or null",
   "occurred_end": "ISO 8601 or null",
@@ -61,7 +61,7 @@ Return a JSON array of facts. Each fact must have this exact structure:
   "fact_type": "world or experience"
 }
 
-Return ONLY the JSON array, no other text."""
+JSON配列のみを返すこと。他のテキストは一切含めないこと。"""
 
 
 @dataclass(frozen=True)

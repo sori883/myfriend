@@ -11,4 +11,5 @@ dependencies = [
     "asyncpg>=0.30.0",
     "pgvector>=0.3.0",
     "boto3>=1.35.0",
+    "aiohttp>=3.11.0",
 ]

@@ -15,8 +15,12 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 ## ディレクトリ構成
 
 - `agentcore/` — Strands Agent エントリポイント + 記憶システム（Python 3.14+）
+  - `main.py` — AgentCore デプロイ用エントリポイント（BedrockAgentCoreApp）
+  - `local.py` — ローカル開発用 HTTP サーバー（aiohttp, port 8080）
+  - `core.py` — Agent 共通ロジック（main.py / local.py 共用）
+- `requester/` — ローカルテスト用チャット UI（HonoX + Cloudflare Workers + Tailwind）
 - `cdk/` — AWS CDK インフラ（TypeScript）
-- `postgresql/` — ローカル開発用 Docker（pgvector/pgvector:pg16）
+- `postgresql/` — ローカル開発用 Docker（pgvector/pgvector:pg16 + pg_bigm）
 - `docs/設計/` — アーキテクチャ設計書・実装タスク
 
 ## 記憶システム（3段階）
@@ -30,10 +34,11 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 - **Agent**: Strands Agents SDK, Bedrock AgentCore
 - **LLM**: Bedrock Converse API（Claude Haiku 4.5 / Sonnet 4.5）
 - **Embedding**: Bedrock Titan Embed V2（1024次元）
-- **DB**: PostgreSQL 16 + pgvector + pg_trgm
+- **DB**: PostgreSQL 16 + pgvector + pg_trgm + pg_bigm（日本語全文検索）
 - **開発DB**: Docker（`postgresql/docker-compose.yml`）
 - **本番DB**: Aurora Serverless v2（商用化フェーズで移行）
 - **IaC**: AWS CDK（TypeScript）
+- **ローカルテスト**: `requester/`（HonoX + Tailwind）、`agentcore/local.py`（aiohttp）
 
 ## 実装進捗
 
@@ -51,8 +56,8 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 | 1.2.3 Embedding 生成 | ✅ 完了 | memory/embedding.py 作成済み（Titan Embed V2, 1024次元） |
 | 1.2.4 エンティティ抽出・解決 | ✅ 完了 | memory/entity.py 作成済み（pg_trgm similarity, 閾値0.6） |
 | 1.2.5 Retain パイプライン | ✅ 完了 | memory/retain.py 作成済み（重複検出含む） |
-| 1.2.6 Recall パイプライン（基本版） | ✅ 完了 | memory/recall.py 作成済み（セマンティック+BM25, RRF融合） |
-| 1.2.7 Strands Agent ツール統合 | ✅ 完了 | main.py 修正済み（remember/recall_memories, bank_idクロージャ固定） |
+| 1.2.6 Recall パイプライン（基本版） | ✅ 完了 | memory/recall.py 作成済み（セマンティック+pg_bigm, RRF融合） |
+| 1.2.7 Strands Agent ツール統合 | ✅ 完了 | core.py に共通化（remember/recall_memories, bank_idクロージャ固定） |
 | 1.3 検証 | ✅ 完了 | 全10項目通過。test_script/ にテストスクリプト3本 |
 
 ### Phase 2: 中期記憶
