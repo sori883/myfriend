@@ -14,16 +14,17 @@ import boto3
 
 logger = logging.getLogger(__name__)
 
-RERANK_MODEL_ID = os.environ.get(
-    "RERANK_MODEL_ID",
-    "amazon.rerank-v1:0",
-)
+_DEFAULT_RERANK_MODEL_ID = "amazon.rerank-v1:0"
 
-_AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 
-RERANK_MODEL_ARN = (
-    f"arn:aws:bedrock:{_AWS_REGION}::foundation-model/{RERANK_MODEL_ID}"
-)
+def _get_rerank_model_id() -> str:
+    return os.environ.get("RERANK_MODEL_ID", _DEFAULT_RERANK_MODEL_ID)
+
+
+def _get_rerank_model_arn() -> str:
+    region = os.environ.get("AWS_REGION", "ap-northeast-1")
+    model_id = _get_rerank_model_id()
+    return f"arn:aws:bedrock:{region}::foundation-model/{model_id}"
 
 # リランク候補の上限（API は最大 1,000 件対応）
 RERANK_CANDIDATE_LIMIT = 300
@@ -42,7 +43,7 @@ def _get_bedrock_agent_runtime_client():
             if _client is None:
                 _client = boto3.client(
                     "bedrock-agent-runtime",
-                    region_name=_AWS_REGION,
+                    region_name=os.environ.get("AWS_REGION", "ap-northeast-1"),
                 )
     return _client
 
@@ -103,7 +104,7 @@ def _invoke_rerank(
             "type": "BEDROCK_RERANKING_MODEL",
             "bedrockRerankingConfiguration": {
                 "modelConfiguration": {
-                    "modelArn": RERANK_MODEL_ARN,
+                    "modelArn": _get_rerank_model_arn(),
                 },
                 "numberOfResults": top_n,
             },

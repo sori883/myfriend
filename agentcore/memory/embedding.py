@@ -12,10 +12,11 @@ from memory.bedrock_client import get_bedrock_runtime_client
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL_ID = os.environ.get(
-    "EMBEDDING_MODEL_ID",
-    "amazon.titan-embed-text-v2:0",
-)
+_DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
+
+
+def _get_embedding_model_id() -> str:
+    return os.environ.get("EMBEDDING_MODEL_ID", _DEFAULT_EMBEDDING_MODEL_ID)
 
 EMBEDDING_DIMENSIONS = 1024
 
@@ -36,7 +37,7 @@ def _invoke_embedding(text: str) -> list[float]:
 
     client = get_bedrock_runtime_client()
     response = client.invoke_model(
-        modelId=EMBEDDING_MODEL_ID,
+        modelId=_get_embedding_model_id(),
         body=json.dumps({
             "inputText": text,
             "dimensions": EMBEDDING_DIMENSIONS,

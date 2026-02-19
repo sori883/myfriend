@@ -85,15 +85,17 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 
 | タスク | ステータス |
 |---|---|
-| 3.1.1 DB マイグレーション（長期記憶テーブル） | 未着手 |
-| 3.2.1 Mental Model CRUD | 未着手 |
-| 3.2.2 Mental Model 自動リフレッシュ | 未着手 |
-| 3.2.3 Reflect パイプライン | 未着手 |
-| 3.2.4 Disposition（性格特性）適用 | 未着手 |
-| 3.2.5 ディレクティブシステム | 未着手 |
-| 3.2.6 Strands Agent Reflect ツール統合 | 未着手 |
-| 3.3.1 並行制御 | 未着手 |
-| 3.3.2 タグベース可視性制御 | 未着手 |
+| 3.1.1 DB マイグレーション（長期記憶テーブル） | ✅ 完了 |
+| 3.2.1 Mental Model CRUD | ✅ 完了 |
+| 3.2.2 Mental Model 自動リフレッシュ | ✅ 完了 |
+| 3.2.3 Reflect パイプライン | ✅ 完了 |
+| 3.2.4 Disposition（性格特性）適用 | ✅ 完了 |
+| 3.2.5 ディレクティブシステム | ✅ 完了 |
+| 3.2.6 Strands Agent Reflect ツール統合 | ✅ 完了 |
+| 3.3.1 並行制御 | ✅ 完了 |
+| 3.3.2 タグベース可視性制御 | ✅ 完了 |
+| 3.4 検証 | ✅ 完了 |
+| 3.5 Mental Model 自動生成（Consolidation 連動） | ✅ 完了 |
 
 ## 開発フロー
 
@@ -122,3 +124,8 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 
 - `code-reviewer` サブエージェントでコードレビュー
 - セキュリティに関わるコードは `security-reviewer` サブエージェントでレビュー
+
+### ４. 進捗管理
+
+- 実装タスクの進捗状況を更新する
+  - `docs/設計/記憶システム実装タスク.md`
