@@ -28,10 +28,11 @@ from memory.freshness import update_freshness_for_bank
 
 logger = logging.getLogger(__name__)
 
-CONSOLIDATION_MODEL_ID = os.environ.get(
-    "CONSOLIDATION_MODEL_ID",
-    "anthropic.claude-3-haiku-20240307-v1:0",
-)
+_DEFAULT_CONSOLIDATION_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+
+
+def _get_consolidation_model_id() -> str:
+    return os.environ.get("CONSOLIDATION_MODEL_ID", _DEFAULT_CONSOLIDATION_MODEL_ID)
 
 CONSOLIDATION_BATCH_SIZE = 10
 
@@ -156,6 +157,7 @@ async def consolidate(pool: asyncpg.Pool, bank_id: str) -> dict:
         "observations_created": 0,
         "observations_updated": 0,
         "skipped": 0,
+        "affected_observation_ids": [],
     }
 
     while True:
@@ -176,11 +178,16 @@ async def consolidate(pool: asyncpg.Pool, bank_id: str) -> dict:
             action = result.get("action")
             if action == "created":
                 stats["observations_created"] += 1
+                if result.get("observation_id"):
+                    stats["affected_observation_ids"].append(result["observation_id"])
             elif action == "updated":
                 stats["observations_updated"] += 1
+                if result.get("observation_id"):
+                    stats["affected_observation_ids"].append(result["observation_id"])
             elif action == "multiple":
                 stats["observations_created"] += result.get("created", 0)
                 stats["observations_updated"] += result.get("updated", 0)
+                stats["affected_observation_ids"].extend(result.get("observation_ids", []))
             elif action == "skipped":
                 stats["skipped"] += 1
 
@@ -205,15 +212,41 @@ async def consolidate(pool: asyncpg.Pool, bank_id: str) -> dict:
             logger.exception("Failed to update freshness for bank %s", bank_id)
             stats["freshness_updated"] = 0
 
+        # Mental Model 自動リフレッシュ・自動生成
+        from memory.mental_model_trigger import (
+            trigger_mental_model_generation,
+            trigger_mental_model_refresh,
+        )
+
+        try:
+            refreshed = await trigger_mental_model_refresh(pool, bank_id)
+            stats["mental_models_refreshed"] = refreshed
+        except Exception:
+            logger.exception("Failed to refresh mental models for bank %s", bank_id)
+            stats["mental_models_refreshed"] = 0
+
+        try:
+            generated = await trigger_mental_model_generation(
+                pool, bank_id, stats["affected_observation_ids"], mission,
+            )
+            stats["mental_models_generated"] = generated
+        except Exception:
+            logger.exception("Failed to generate mental models for bank %s", bank_id)
+            stats["mental_models_generated"] = 0
+
     elapsed_ms = (time.monotonic() - started_at) * 1000
 
     logger.info(
-        "Consolidation complete for bank %s: processed=%d, created=%d, updated=%d, skipped=%d (%.0fms)",
+        "Consolidation complete for bank %s: "
+        "processed=%d, created=%d, updated=%d, skipped=%d, "
+        "mm_refreshed=%d, mm_generated=%d (%.0fms)",
         bank_id,
         stats["processed"],
         stats["observations_created"],
         stats["observations_updated"],
         stats["skipped"],
+        stats.get("mental_models_refreshed", 0),
+        stats.get("mental_models_generated", 0),
         elapsed_ms,
     )
 
@@ -401,6 +434,7 @@ async def _process_fact(
         "created": created,
         "updated": updated,
         "total_actions": len(results),
+        "observation_ids": [r["observation_id"] for r in results if "observation_id" in r],
     }
 
 
@@ -422,7 +456,7 @@ def _call_consolidation_llm(fact_text: str, observations_text: str, mission: str
     )
 
     response = client.converse(
-        modelId=CONSOLIDATION_MODEL_ID,
+        modelId=_get_consolidation_model_id(),
         messages=[
             {
                 "role": "user",
@@ -532,6 +566,20 @@ async def _execute_create_action(
     )
 
     obs_id = str(row["id"])
+
+    # 元 Fact のエンティティリンクを Observation に引き継ぐ
+    await conn.execute(
+        """
+        INSERT INTO unit_entities (unit_id, entity_id)
+        SELECT $1::uuid, entity_id
+        FROM unit_entities
+        WHERE unit_id = $2::uuid
+        ON CONFLICT DO NOTHING
+        """,
+        obs_id,
+        source_memory_id,
+    )
+
     logger.debug("Created observation %s from fact %s", obs_id, source_memory_id)
     return {"action": "created", "observation_id": obs_id}
 
@@ -602,6 +650,19 @@ async def _execute_update_action(
         source_occurred_start,
         source_occurred_end,
         source_mentioned_at,
+    )
+
+    # 新しい source Fact のエンティティリンクを Observation に追加
+    await conn.execute(
+        """
+        INSERT INTO unit_entities (unit_id, entity_id)
+        SELECT $1::uuid, entity_id
+        FROM unit_entities
+        WHERE unit_id = $2::uuid
+        ON CONFLICT DO NOTHING
+        """,
+        target["id"],
+        source_memory_id,
     )
 
     logger.debug("Updated observation %s from fact %s", learning_id, source_memory_id)

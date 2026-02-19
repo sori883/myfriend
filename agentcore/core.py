@@ -31,9 +31,11 @@ memory_engine = MemoryEngine()
 MAX_CONTENT_LENGTH = 10000
 MAX_QUERY_LENGTH = 1000
 MAX_CONTEXT_LENGTH = 2000
+MAX_TOPIC_LENGTH = 2000
 ALLOWED_BUDGETS = frozenset({"low", "mid", "high"})
 
 _ASYNC_CALL_TIMEOUT = 60
+_REFLECT_TIMEOUT = 300  # Reflect は最大10イテレーションのため長めのタイムアウト
 
 SYSTEM_PROMPT = """\
 あなたは長期記憶を持つ親切なアシスタントです。
@@ -43,6 +45,7 @@ SYSTEM_PROMPT = """\
 
 - **remember**: 会話から重要な事実を記憶に保存する。ユーザーが個人情報、好み、予定、その他記憶すべき情報を共有した場合に使用する。
 - **recall_memories**: 長期記憶から関連情報を検索する。会話の冒頭や、ユーザーに関する過去の情報が役立つ場面で使用する。
+- **reflect_on**: トピックについて深く推論する。複雑な質問、過去の記憶に基づく分析、パターンの発見など、深い思考が必要な場合に使用する。
 
 ## 絶対ルール
 
@@ -56,6 +59,8 @@ SYSTEM_PROMPT = """\
 4. ユーザーのメッセージに新しい重要な事実があれば、積極的に remember を呼び出して保存すること。
    remember の content パラメータも**日本語**で記述すること。
 5. ユーザーから聞かれない限り、記憶システムの仕組みについて言及しないこと。
+6. ユーザーが深い分析や推論を求めた場合、reflect_on を使用すること。
+   reflect_on は記憶の3階層（Mental Models → Observations → Raw Facts）を活用して証拠に基づいた回答を生成する。
 """
 
 # ---------------------------------------------------------------------------
@@ -212,7 +217,42 @@ def _build_tools(bank_id: str):
                 ensure_ascii=False,
             )
 
-    return [remember, recall_memories]
+    @tool
+    def reflect_on(topic: str) -> str:
+        """トピックについて深く推論する。記憶の3階層（Mental Models → Observations → Raw Facts）を活用して、証拠に基づいた深い分析を行う。複雑な質問やパターン分析に使用する。
+
+        Args:
+            topic: 推論するトピック（質問形式で記述、日本語）
+        """
+        if not topic or not topic.strip():
+            return json.dumps({"error": "topic is required"}, ensure_ascii=False)
+        if len(topic) > MAX_TOPIC_LENGTH:
+            return json.dumps(
+                {"error": f"topic exceeds maximum length of {MAX_TOPIC_LENGTH}"},
+                ensure_ascii=False,
+            )
+
+        try:
+            loop = _get_bg_loop()
+            future = asyncio.run_coroutine_threadsafe(
+                memory_engine.reflect(bank_id, topic), loop
+            )
+            result = future.result(timeout=_REFLECT_TIMEOUT)
+            return json.dumps(result, ensure_ascii=False)
+        except TimeoutError:
+            logger.error("Reflect timed out after %ds", _REFLECT_TIMEOUT)
+            return json.dumps(
+                {"error": "Reflect operation timed out. Please try a simpler query."},
+                ensure_ascii=False,
+            )
+        except Exception:
+            logger.error("Failed to reflect", exc_info=True)
+            return json.dumps(
+                {"error": "Failed to perform reflection. Please try again."},
+                ensure_ascii=False,
+            )
+
+    return [remember, recall_memories, reflect_on]
 
 
 def create_agent(bank_id: str, model_id: str) -> Agent:

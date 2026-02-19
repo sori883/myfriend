@@ -14,10 +14,11 @@ from memory.bedrock_client import get_bedrock_runtime_client
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_MODEL_ID = os.environ.get(
-    "EXTRACTION_MODEL_ID",
-    "anthropic.claude-3-haiku-20240307-v1:0",
-)
+_DEFAULT_EXTRACTION_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+
+
+def _get_extraction_model_id() -> str:
+    return os.environ.get("EXTRACTION_MODEL_ID", _DEFAULT_EXTRACTION_MODEL_ID)
 
 MAX_CONTENT_LENGTH = 10000
 
@@ -168,7 +169,7 @@ def _call_converse(content: str, context: str) -> list[dict]:
     )
 
     response = client.converse(
-        modelId=EXTRACTION_MODEL_ID,
+        modelId=_get_extraction_model_id(),
         messages=[
             {
                 "role": "user",
