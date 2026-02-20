@@ -42,60 +42,7 @@ API Gateway → Proxy Lambda (Node.js) → Bedrock AgentCore → Strands Agent (
 
 ## 実装進捗
 
-タスク詳細は `docs/設計/記憶システム実装タスク.md` を参照。各タスクの見出しに ✅ が付いているものは完了済み。
-
-### Phase 1: 短期記憶
-
-| タスク | ステータス | 備考 |
-|---|---|---|
-| 1.1.1 Docker PostgreSQL 環境の拡張 | ✅ 完了 | Dockerfile, docker-compose.yml 修正済み |
-| 1.1.2 DB マイグレーション（短期記憶テーブル） | ✅ 完了 | 001_extensions.sql, 002_short_term.sql 作成済み |
-| 1.1.3 Python DB 接続設定 | ✅ 完了 | memory/db.py, pyproject.toml, .env 更新済み |
-| 1.2.1 Memory Engine コアモジュール | ✅ 完了 | memory/engine.py, memory/__init__.py 作成済み |
-| 1.2.2 LLM ファクト抽出 | ✅ 完了 | memory/extraction.py 作成済み（Bedrock Converse, Fact dataclass） |
-| 1.2.3 Embedding 生成 | ✅ 完了 | memory/embedding.py 作成済み（Titan Embed V2, 1024次元） |
-| 1.2.4 エンティティ抽出・解決 | ✅ 完了 | memory/entity.py 作成済み（pg_trgm similarity, 閾値0.6） |
-| 1.2.5 Retain パイプライン | ✅ 完了 | memory/retain.py 作成済み（重複検出含む） |
-| 1.2.6 Recall パイプライン（基本版） | ✅ 完了 | memory/recall.py 作成済み（セマンティック+pg_bigm, RRF融合） |
-| 1.2.7 Strands Agent ツール統合 | ✅ 完了 | core.py に共通化（remember/recall_memories, bank_idクロージャ固定） |
-| 1.3 検証 | ✅ 完了 | 全10項目通過。test_script/ にテストスクリプト3本 |
-
-### Phase 2: 中期記憶
-
-| タスク | ステータス |
-|---|---|
-| 2.1.1 DB マイグレーション（中期記憶テーブル） | ✅ 完了 |
-| 2.1.2 ローカル Consolidation スケジューラー | ✅ 完了 |
-| 2.2.1 Consolidation Worker コアロジック | ✅ 完了 |
-| 2.2.2 鮮度追跡 | ✅ 完了 |
-| 2.3.1 グラフリンク構築 | ✅ 完了 |
-| 2.3.2 MPFP グラフ検索 | ✅ 完了 |
-| 2.3.3 時間検索 | ✅ 完了 |
-| 2.4.1 4方向並列検索統合 | ✅ 完了 |
-| 2.4.2 クロスエンコーダリランキング | ✅ 完了 |
-| 2.4.3 バッチクエリ最適化 | ✅ 完了 |
-| 2.6.1 共起エンティティスコアリング | ✅ 完了 |
-| 2.6.2 時間的近接性スコアリング | ✅ 完了 |
-| 2.6.3 エンティティ解決のバッチ処理 | ✅ 完了 |
-| 2.7.1 カレンダー境界の正確な計算 | ✅ 完了 |
-| 2.7.2 曜日・月年パターンの追加 | ✅ 完了 |
-| 2.8 検証 | ✅ 完了 |
-
-### Phase 3: 長期記憶
-
-| タスク | ステータス |
-|---|---|
-| 3.1.1 DB マイグレーション（長期記憶テーブル） | ✅ 完了 |
-| 3.2.1 Mental Model CRUD | ✅ 完了 |
-| 3.2.2 Mental Model 自動リフレッシュ | ✅ 完了 |
-| 3.2.3 Reflect パイプライン | ✅ 完了 |
-| 3.2.4 Disposition（性格特性）適用 | ✅ 完了 |
-| 3.2.5 ディレクティブシステム | ✅ 完了 |
-| 3.2.6 Strands Agent Reflect ツール統合 | ✅ 完了 |
-| 3.3.1 並行制御 | ✅ 完了 |
-| 3.3.2 タグベース可視性制御 | ✅ 完了 |
-| 3.4 検証 | ✅ 完了 |
-| 3.5 Mental Model 自動生成（Consolidation 連動） | ✅ 完了 |
+タスク詳細は `docs/設計/記憶システム実装タスク.md` を参照。各タスクの見出しに ✅ が付いているものは完了済み。![alt text](<ss 1.png>)
 
 ## 開発フロー
 
