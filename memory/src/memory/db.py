@@ -23,9 +23,12 @@ async def get_pool() -> asyncpg.Pool:
     商用化時は RDS Proxy エンドポイントに差し替えるだけで移行可能。
     """
     global _pool
-    # asyncpg.Pool には公開 API としての closed 判定がないため _closed を使用
-    if _pool is not None and not _pool._closed:
-        return _pool
+    if _pool is not None:
+        try:
+            await _pool.fetchval("SELECT 1")
+            return _pool
+        except Exception:
+            _pool = None
 
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
@@ -56,7 +59,10 @@ async def get_pool() -> asyncpg.Pool:
 async def close_pool() -> None:
     """接続プールを閉じる"""
     global _pool
-    if _pool is not None and not _pool._closed:
-        await _pool.close()
-        logger.info("Database connection pool closed")
+    if _pool is not None:
+        try:
+            await _pool.close()
+            logger.info("Database connection pool closed")
+        except Exception:
+            logger.warning("Failed to close database connection pool", exc_info=True)
     _pool = None

@@ -26,6 +26,11 @@ from memory.embedding import generate_embedding
 from memory.extraction import extract_json_array
 from memory.freshness import update_freshness_for_bank
 
+from mental_model_trigger import (
+    trigger_mental_model_generation,
+    trigger_mental_model_refresh,
+)
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CONSOLIDATION_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
@@ -213,11 +218,6 @@ async def consolidate(pool: asyncpg.Pool, bank_id: str) -> dict:
             stats["freshness_updated"] = 0
 
         # Mental Model 自動リフレッシュ・自動生成
-        from memory.mental_model_trigger import (
-            trigger_mental_model_generation,
-            trigger_mental_model_refresh,
-        )
-
         try:
             refreshed = await trigger_mental_model_refresh(pool, bank_id)
             stats["mental_models_refreshed"] = refreshed

@@ -1,11 +1,18 @@
+# Build context must be the repository root:
+#   docker build -f agentcore/Dockerfile -t agentcore .
+
 FROM python:3.13-slim-trixie
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy application files
-ADD . /app
-WORKDIR /app
+# Copy workspace structure
+COPY pyproject.toml /app/pyproject.toml
+COPY uv.lock /app/uv.lock
+COPY memory/ /app/memory/
+COPY agentcore/ /app/agentcore/
+
+WORKDIR /app/agentcore
 
 # Install dependencies
 RUN uv sync --locked

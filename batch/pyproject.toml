@@ -1,0 +1,11 @@
+[project]
+name = "batch"
+version = "0.1.0"
+description = "Batch consolidation worker for memory system"
+requires-python = ">=3.13"
+dependencies = [
+    "memory",
+    "python-dotenv>=1.0.0",
+]
+[tool.uv.sources]
+memory = { workspace = true }
