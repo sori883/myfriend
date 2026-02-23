@@ -40,16 +40,20 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
 
     response = web.StreamResponse(
         status=200,
-        headers={"Content-Type": "text/plain; charset=utf-8"},
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
     await response.prepare(request)
 
     try:
         async for chunk in stream_agent(bank_id, prompt.strip(), AGENT_MODEL_ID):
-            await response.write(chunk.encode("utf-8"))
+            await response.write(f"data: {chunk}\n\n".encode("utf-8"))
     except Exception:
         logger.error("Agent stream error", exc_info=True)
-        await response.write(b"\n[Error: Agent execution failed]")
+        await response.write(b"data: \n[Error: Agent execution failed]\n\n")
 
     await response.write_eof()
     return response
