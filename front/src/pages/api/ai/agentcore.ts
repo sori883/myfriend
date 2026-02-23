@@ -25,23 +25,23 @@ export default async function handler(req: NextRequest) {
   // URL はサーバーサイド環境変数から取得（SSRF 防止）
   const agentcoreUrl = process.env.AGENTCORE_URL || 'http://localhost:8080'
 
-  const { messages, agentcoreBankId } = (await req.json()) as {
-    messages: Message[]
-    agentcoreBankId: string
-  }
-
-  // bank_id の UUID バリデーション
+  // bank_id はサーバーサイド環境変数から取得（クライアントに露出しない）
+  const agentcoreBankId = process.env.AGENTCORE_BANK_ID
   if (!agentcoreBankId || !UUID_REGEX.test(agentcoreBankId)) {
     return new Response(
       JSON.stringify({
-        error: 'Invalid bank ID format',
+        error: 'AGENTCORE_BANK_ID is not configured',
         errorCode: 'AgentCoreInvalidBankId',
       }),
       {
-        status: 400,
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       }
     )
+  }
+
+  const { messages } = (await req.json()) as {
+    messages: Message[]
   }
 
   // 最新の user メッセージを抽出

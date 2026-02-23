@@ -421,9 +421,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_INCLUDE_SYSTEM_MESSAGES_IN_CUSTOM_API !== 'false',
   customApiIncludeMimeType:
     process.env.NEXT_PUBLIC_CUSTOM_API_INCLUDE_MIME_TYPE !== 'false',
-  agentcoreBankId:
-    process.env.NEXT_PUBLIC_AGENTCORE_BANK_ID ||
-    '00000000-0000-4000-8000-000000000001',
+  agentcoreBankId: '00000000-0000-4000-8000-000000000001',
 
   // Integrations
   difyUrl: '',
@@ -486,7 +484,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_CHARACTER_PRESET1 ||
     '',
   selectedVrmPath:
-    process.env.NEXT_PUBLIC_SELECTED_VRM_PATH || '/vrm/nikechan_v1.vrm',
+    '/vrm/nikechan_v1.vrm',
   selectedLive2DPath:
     process.env.NEXT_PUBLIC_SELECTED_LIVE2D_PATH ||
     '/live2d/nike01/nike01.model3.json',

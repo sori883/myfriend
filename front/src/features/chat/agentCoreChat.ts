@@ -12,15 +12,10 @@ function handleApiError(errorCode: string): string {
 export async function getAgentCoreChatResponseStream(
   messages: Message[]
 ): Promise<ReadableStream<string>> {
-  const ss = settingsStore.getState()
-
   const response = await fetch('/api/ai/agentcore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages,
-      agentcoreBankId: ss.agentcoreBankId,
-    }),
+    body: JSON.stringify({ messages }),
   })
 
   if (!response.ok) {
