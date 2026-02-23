@@ -44,6 +44,24 @@ export default async function handler(req: NextRequest) {
     messages: Message[]
   }
 
+  // メッセージからテキストを抽出するヘルパー
+  type TextContent = { type: 'text'; text: string }
+  const extractText = (msg: Message): string => {
+    const raw =
+      typeof msg.content === 'string'
+        ? msg.content
+        : Array.isArray(msg.content)
+          ? msg.content
+              .filter((c): c is TextContent => c.type === 'text')
+              .map((c) => c.text)
+              .join('\n')
+          : ''
+    // アシスタントの感情タグを除去
+    return msg.role === 'assistant'
+      ? raw.replace(/\[([a-zA-Z]*?)\]\s*/g, '')
+      : raw
+  }
+
   // 最新の user メッセージを抽出
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')
 
@@ -60,17 +78,7 @@ export default async function handler(req: NextRequest) {
     )
   }
 
-  // content が配列の場合はテキスト部分のみ抽出
-  type TextContent = { type: 'text'; text: string }
-  const prompt =
-    typeof lastUserMessage.content === 'string'
-      ? lastUserMessage.content
-      : Array.isArray(lastUserMessage.content)
-        ? lastUserMessage.content
-            .filter((c): c is TextContent => c.type === 'text')
-            .map((c) => c.text)
-            .join('\n')
-        : ''
+  const prompt = extractText(lastUserMessage)
 
   if (!prompt.trim()) {
     return new Response(
@@ -84,6 +92,13 @@ export default async function handler(req: NextRequest) {
       }
     )
   }
+
+  // 会話履歴を構築（最新 user メッセージを除く直近20件）
+  const history = messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-21, -1)
+    .map((m) => ({ role: m.role, content: extractText(m) }))
+    .filter((m) => m.content.trim())
 
   const invokeUrl = `${agentcoreUrl}/invoke`
 
@@ -102,6 +117,7 @@ export default async function handler(req: NextRequest) {
       body: JSON.stringify({
         bank_id: agentcoreBankId,
         prompt: prompt.trim(),
+        messages: history,
       }),
       signal: AbortSignal.timeout(180000),
     })

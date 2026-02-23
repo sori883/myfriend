@@ -67,7 +67,9 @@ async def invoke(payload):
         yield json.dumps({"error": "prompt is required."})
         return
 
-    async for chunk in stream_agent(bank_id, str(prompt).strip(), AGENT_MODEL_ID):
+    history = payload.get("messages", [])
+
+    async for chunk in stream_agent(bank_id, str(prompt).strip(), AGENT_MODEL_ID, history):
         yield chunk
 
 

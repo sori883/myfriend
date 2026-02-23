@@ -38,6 +38,8 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
     if not isinstance(prompt, str) or not prompt.strip():
         return web.json_response({"error": "prompt must be a non-empty string"}, status=400)
 
+    history = body.get("messages", [])
+
     response = web.StreamResponse(
         status=200,
         headers={"Content-Type": "text/plain; charset=utf-8"},
@@ -45,7 +47,7 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
     await response.prepare(request)
 
     try:
-        async for chunk in stream_agent(bank_id, prompt.strip(), AGENT_MODEL_ID):
+        async for chunk in stream_agent(bank_id, prompt.strip(), AGENT_MODEL_ID, history):
             await response.write(chunk.encode("utf-8"))
     except Exception:
         logger.error("Agent stream error", exc_info=True)
