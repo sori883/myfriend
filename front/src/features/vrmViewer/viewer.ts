@@ -54,20 +54,10 @@ export class Viewer {
       this.unloadVRM()
     }
 
-    // プライベート Blob URL の場合は署名付きダウンロード URL を取得
+    // プライベート Blob URL の場合はプロキシ経由でアクセス
     let resolvedUrl = url
     if (url.includes('.private.blob.vercel-storage.com')) {
-      try {
-        const res = await fetch(
-          `/api/blob-url?url=${encodeURIComponent(url)}`
-        )
-        if (res.ok) {
-          const { downloadUrl } = await res.json()
-          resolvedUrl = downloadUrl
-        }
-      } catch (e) {
-        console.error('Failed to resolve blob URL:', e)
-      }
+      resolvedUrl = `/api/blob-url?url=${encodeURIComponent(url)}`
     }
 
     // gltf and vrm

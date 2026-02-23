@@ -13,24 +13,20 @@ export default function VrmViewer() {
       viewer.setup(canvas)
 
       // サーバー設定から VRM パスを取得（環境変数をクライアントに露出しない）
-      // settingsStore に値がなければサーバー設定を使用
-      if (selectedVrmPath && !selectedVrmPath.includes('nikechan_v1.vrm')) {
-        viewer.loadVrm(selectedVrmPath)
-      } else {
-        fetch('/api/server-config')
-          .then((res) => res.json())
-          .then(({ selectedVrmPath: serverPath }) => {
-            const vrmPath = serverPath || selectedVrmPath
-            if (vrmPath) {
-              settingsStore.setState({ selectedVrmPath: vrmPath })
-              viewer.loadVrm(vrmPath)
-            }
-          })
-          .catch(() => {
-            // フォールバック: settingsStore の値を使用
-            viewer.loadVrm(selectedVrmPath)
-          })
-      }
+      // サーバーに設定があればそちらを優先（Vercel Blob 等）
+      fetch('/api/server-config')
+        .then((res) => res.json())
+        .then(({ selectedVrmPath: serverPath }) => {
+          const vrmPath = serverPath || selectedVrmPath
+          if (vrmPath) {
+            settingsStore.setState({ selectedVrmPath: vrmPath })
+            viewer.loadVrm(vrmPath)
+          }
+        })
+        .catch(() => {
+          // フォールバック: settingsStore の値を使用
+          viewer.loadVrm(selectedVrmPath)
+        })
 
       // Drag and DropでVRMを差し替え
       canvas.addEventListener('dragover', function (event) {
