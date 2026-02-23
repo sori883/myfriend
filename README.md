@@ -2,8 +2,6 @@
 
 https://mk22.booth.pm/items/5007531
 
-- 
-
 # docs
 
 下記参照
