@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EMOTIONS } from '@/features/messages/messages'
 
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
@@ -145,8 +144,7 @@ const Chat = ({
   const showThinkingText = settingsStore((s) => s.showThinkingText)
   const [isLocalExpanded, setIsLocalExpanded] = useState(false)
   const isThinkingExpanded = showThinkingText || isLocalExpanded
-  const emotionPattern = new RegExp(`\\[(${EMOTIONS.join('|')})\\]\\s*`, 'gi')
-  const processedMessage = message.replace(emotionPattern, '')
+  const processedMessage = message.replace(/\[([a-zA-Z]*?)\]\s*/g, '')
 
   const roleColor =
     role !== 'user' ? 'bg-secondary text-theme ' : 'bg-base-light text-primary'
