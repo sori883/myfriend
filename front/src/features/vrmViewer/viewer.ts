@@ -4,6 +4,7 @@ import { loadVRMAnimation } from '@/lib/VRMAnimation/loadVRMAnimation'
 import { buildUrl } from '@/utils/buildUrl'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import settingsStore from '@/features/stores/settings'
+import { decryptVrmData } from '@/utils/blobDecryption'
 
 /**
  * three.jsを使った3Dビューワー
@@ -21,6 +22,7 @@ export class Viewer {
   private _cameraControls?: OrbitControls
   private _directionalLight?: THREE.DirectionalLight
   private _ambientLight?: THREE.AmbientLight
+  private _currentBlobUrl?: string
 
   constructor() {
     this.isReady = false
@@ -54,11 +56,10 @@ export class Viewer {
       this.unloadVRM()
     }
 
-    // プライベート Blob URL の場合はプロキシ経由でアクセス
-    let resolvedUrl = url
-    if (url.includes('.private.blob.vercel-storage.com')) {
-      resolvedUrl = `/api/blob-url?url=${encodeURIComponent(url)}`
-    }
+    // プライベート Blob URL の場合は暗号化プロキシ経由でアクセス
+    const resolvedUrl = url.includes('.private.blob.vercel-storage.com')
+      ? await this._resolveEncryptedBlobUrl(url)
+      : url
 
     // gltf and vrm
     this.model = new Model(this._camera || new THREE.Object3D())
@@ -82,7 +83,62 @@ export class Viewer {
     })
   }
 
+  /**
+   * 暗号化されたPrivate Blobを復号してblob URLを返す。
+   * 暗号化未設定の場合は生データからblob URLを生成する。
+   */
+  private async _resolveEncryptedBlobUrl(
+    originalUrl: string
+  ): Promise<string> {
+    const proxyUrl = `/api/blob-url?url=${encodeURIComponent(originalUrl)}`
+
+    const response = await fetch(proxyUrl)
+    if (!response.ok) {
+      throw new Error(`Blob fetch failed: ${response.status}`)
+    }
+
+    const isEncrypted = response.headers.get('X-Blob-Encrypted')
+
+    if (isEncrypted) {
+      const encryptedData = await response.arrayBuffer()
+
+      const keyResponse = await fetch(
+        `/api/blob-key?url=${encodeURIComponent(originalUrl)}`
+      )
+      if (!keyResponse.ok) {
+        throw new Error(`Key fetch failed: ${keyResponse.status}`)
+      }
+
+      const keyData = await keyResponse.json()
+      if (!keyData.key || !keyData.iv) {
+        throw new Error('Invalid key response: missing key or iv')
+      }
+
+      const decryptedData = await decryptVrmData(
+        encryptedData,
+        keyData.key,
+        keyData.iv
+      )
+      const blob = new Blob([decryptedData], {
+        type: 'application/octet-stream',
+      })
+      const blobUrl = URL.createObjectURL(blob)
+      this._currentBlobUrl = blobUrl
+      return blobUrl
+    }
+
+    const rawData = await response.arrayBuffer()
+    const blob = new Blob([rawData], { type: 'application/octet-stream' })
+    const blobUrl = URL.createObjectURL(blob)
+    this._currentBlobUrl = blobUrl
+    return blobUrl
+  }
+
   public unloadVRM(): void {
+    if (this._currentBlobUrl) {
+      URL.revokeObjectURL(this._currentBlobUrl)
+      this._currentBlobUrl = undefined
+    }
     if (this.model?.vrm) {
       this._scene.remove(this.model.vrm.scene)
       this.model?.unLoadVrm()
