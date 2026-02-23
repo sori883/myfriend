@@ -26,6 +26,7 @@ interface ClientRequest {
   sessionId?: string;
   prompt: string;
   bank_id: string;
+  messages?: Array<{ role: string; content: string }>;
 }
 
 // Lambda Response Streaming用の型定義
@@ -82,6 +83,7 @@ export const handler = awslambda.streamifyResponse(
           JSON.stringify({
             prompt: requestParams.prompt,
             bank_id: requestParams.bank_id,
+            messages: requestParams.messages || [],
           })
         ),
         qualifier: 'DEFAULT',

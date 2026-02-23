@@ -39,6 +39,9 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
         return web.json_response({"error": "prompt must be a non-empty string"}, status=400)
 
     history = body.get("messages", [])
+    logger.info("Received %d history messages, prompt: %s", len(history), prompt[:100])
+    if history:
+        logger.info("History sample: %s", history[:2])
 
     response = web.StreamResponse(
         status=200,

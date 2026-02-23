@@ -113,6 +113,12 @@ export class Model {
 
     this.emoteController?.update(delta)
     this.mixer?.update(delta)
+
+    // ボディジェスチャーを加算適用（mixer がボーンを書いた後、vrm が処理する前）
+    if (this.vrm) {
+      this.emoteController?.applyGesture(this.vrm)
+    }
+
     this.vrm?.update(delta)
   }
 }

@@ -94,11 +94,21 @@ export default async function handler(req: NextRequest) {
   }
 
   // 会話履歴を構築（最新 user メッセージを除く直近20件）
-  const history = messages
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .slice(-21, -1)
+  const userAssistantMessages = messages.filter(
+    (m) => m.role === 'user' || m.role === 'assistant'
+  )
+  const history = userAssistantMessages
+    .slice(0, -1)
+    .slice(-20)
     .map((m) => ({ role: m.role, content: extractText(m) }))
     .filter((m) => m.content.trim())
+  console.log(
+    `[agentcore] total messages: ${messages.length}, user/assistant: ${userAssistantMessages.length}, history sent: ${history.length}`
+  )
+  console.log(
+    '[agentcore] all roles:',
+    messages.map((m) => `${m.role}:${typeof m.content === 'string' ? m.content.slice(0, 30) : 'array'}`)
+  )
 
   const invokeUrl = `${agentcoreUrl}/invoke`
 

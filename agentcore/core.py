@@ -301,13 +301,21 @@ def _build_tools(bank_id: str):
 
 
 def _to_bedrock_messages(messages: list[dict]) -> list[dict]:
-    """フロントエンドのメッセージを Bedrock Converse API 形式に変換する"""
-    result = []
+    """フロントエンドのメッセージを Bedrock Converse API 形式に変換する。
+
+    Bedrock Converse API は user/assistant が交互である必要があるため、
+    連続する同一ロールのメッセージはマージする。
+    """
+    result: list[dict] = []
     for msg in messages:
         role = msg.get("role")
-        content = msg.get("content", "")
-        if role in ("user", "assistant") and content:
-            result.append({"role": role, "content": [{"text": str(content)}]})
+        content = str(msg.get("content", "")).strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        if result and result[-1]["role"] == role:
+            result[-1]["content"][0]["text"] += "\n" + content
+        else:
+            result.append({"role": role, "content": [{"text": content}]})
     return result
 
 
