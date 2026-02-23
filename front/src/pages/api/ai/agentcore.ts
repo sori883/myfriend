@@ -142,9 +142,17 @@ export default async function handler(req: NextRequest) {
         const lines = text.split('\n')
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data) {
-              controller.enqueue(encoder.encode(data))
+            const raw = line.slice(6)
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw)
+                if (typeof parsed === 'string') {
+                  controller.enqueue(encoder.encode(parsed))
+                }
+              } catch {
+                // JSON パース失敗時はそのまま転送
+                controller.enqueue(encoder.encode(raw))
+              }
             }
           }
         }

@@ -14,6 +14,8 @@ import os
 
 from aiohttp import web
 
+import json
+
 from core import validate_bank_id, stream_agent, shutdown
 
 logger = logging.getLogger(__name__)
@@ -50,7 +52,7 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
 
     try:
         async for chunk in stream_agent(bank_id, prompt.strip(), AGENT_MODEL_ID):
-            await response.write(f"data: {chunk}\n\n".encode("utf-8"))
+            await response.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
     except Exception:
         logger.error("Agent stream error", exc_info=True)
         await response.write(b"data: \n[Error: Agent execution failed]\n\n")
