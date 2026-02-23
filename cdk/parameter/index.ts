@@ -50,7 +50,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         enabled: true,
       },
       api: {
-        dailyQuota: 10000,
+        dailyQuota: 50,
       },
     },
     stg: {
@@ -85,7 +85,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         enabled: false,
       },
       api: {
-        dailyQuota: 1000,
+        dailyQuota: 50,
       },
     },
     dev: {
@@ -120,7 +120,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         enabled: true,
       },
       api: {
-        dailyQuota: 1000,
+        dailyQuota: 50,
       },
     },
   };
