@@ -1,5 +1,6 @@
 import logging
 import os
+import ssl as ssl_module
 
 import asyncpg
 from pgvector.asyncpg import register_vector
@@ -34,12 +35,20 @@ async def get_pool() -> asyncpg.Pool:
     if not database_url:
         raise RuntimeError("DATABASE_URL environment variable is not set")
 
+    # Aurora 接続時は SSL を有効化（証明書検証はスキップ: VPC 内通信のため）
+    ssl_ctx = None
+    if os.environ.get("DB_USE_SSL"):
+        ssl_ctx = ssl_module.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl_module.CERT_NONE
+
     try:
         _pool = await asyncpg.create_pool(
             dsn=database_url,
             min_size=2,
             max_size=10,
             init=_init_connection,
+            ssl=ssl_ctx,
         )
     except asyncpg.InvalidCatalogNameError as e:
         raise RuntimeError(

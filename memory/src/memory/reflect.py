@@ -31,7 +31,7 @@ from memory.visibility import build_tags_where_clause
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_REFLECT_MODEL_ID = "anthropic.claude-sonnet-4-20250514-v1:0"
+_DEFAULT_REFLECT_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 
 
 def _get_reflect_model_id() -> str:

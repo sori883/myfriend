@@ -1,0 +1,26 @@
+export default {
+  endOfLine: "lf",
+  printWidth: 80,
+  tabWidth: 2,
+  semi: true,
+  singleQuote: true,
+  trailingComma: "es5",
+  bracketSpacing: true,
+  htmlWhitespaceSensitivity: "css",
+  importOrder: [
+    "<TYPES>",
+    "^(aws-cdk-lib/(.*)$)|^(aws-cdk-lib$)",
+    "^(parameter/(.*)$)|^(parameter$)",
+    "^(constructs/(.*)$)|^(constructs$)",
+    "<THIRD_PARTY_MODULES>",
+    "",
+    "<TYPES>^[.|..|~]",
+    "^@/",
+    "^[../]",
+    "^[./]",
+  ],
+  importOrderParserPlugins: ["typescript"],
+  plugins: [
+    "@ianvs/prettier-plugin-sort-imports",
+  ],
+};

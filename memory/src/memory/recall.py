@@ -143,10 +143,10 @@ async def _bm25_search(
     bank_id: str,
     query: str,
 ) -> list[asyncpg.Record]:
-    """PARTITION BY fact_type でバランスされた全文検索（pg_bigm）
+    """PARTITION BY fact_type でバランスされた全文検索（pg_trgm）
 
     クエリから日本語助詞ベースでキーワードを抽出し、
-    各キーワードの OR で LIKE 検索、MAX(bigm_similarity) でスコアリング。
+    各キーワードの OR で LIKE 検索、MAX(similarity) でスコアリング。
     """
     keywords = _extract_keywords(query)
     if not keywords:
@@ -164,16 +164,16 @@ async def _bm25_search(
                 SELECT id, text, context, fact_type, fact_kind, event_date,
                        created_at, occurred_start, mentioned_at,
                        (SELECT MAX(GREATEST(
-                           bigm_similarity(mu.text, kw),
-                           bigm_similarity(COALESCE(mu.context, ''), kw)
+                           similarity(mu.text, kw),
+                           similarity(COALESCE(mu.context, ''), kw)
                        )) FROM unnest($1::text[]) AS kw) AS score
                 FROM memory_units mu
                 WHERE mu.bank_id = $2::uuid
                   AND mu.fact_type = ANY($3::text[])
                   AND EXISTS (
                       SELECT 1 FROM unnest($1::text[]) AS kw
-                      WHERE mu.text LIKE likequery(kw)
-                         OR mu.context LIKE likequery(kw)
+                      WHERE mu.text ILIKE '%' || kw || '%'
+                         OR mu.context ILIKE '%' || kw || '%'
                   )
             ),
             ranked AS (

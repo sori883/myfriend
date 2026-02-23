@@ -1,7 +1,7 @@
 # Build context must be the repository root:
 #   docker build -f agentcore/Dockerfile -t agentcore .
 
-FROM python:3.13-slim-trixie
+FROM python:3.13-slim-bookworm
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -11,6 +11,7 @@ COPY pyproject.toml /app/pyproject.toml
 COPY uv.lock /app/uv.lock
 COPY memory/ /app/memory/
 COPY agentcore/ /app/agentcore/
+COPY batch/pyproject.toml /app/batch/pyproject.toml
 
 WORKDIR /app/agentcore
 
@@ -20,4 +21,4 @@ RUN uv sync --locked
 ENV UV_CACHE_DIR=/tmp/uv-cache
 ENV PORT=8080
 
-CMD ["uv", "run", "main.py"]
+CMD ["uv", "run", "--no-sync", "main.py"]

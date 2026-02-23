@@ -1,0 +1,15 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+cdk.out
+build
+
+# CDK asset staging directory
+.cdk.staging
+assets
+
+# Dotenv
+.env.dev
+.env.stg
+.env.prd

@@ -9,7 +9,7 @@ Usage:
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(".env.local")
 
 import asyncio
 import json

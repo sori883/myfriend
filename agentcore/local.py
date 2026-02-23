@@ -7,7 +7,7 @@ Usage:
 Hosts the agent on http://localhost:8080/invoke
 """
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(".env.local")
 
 import logging
 import os

@@ -88,9 +88,17 @@ export default async function handler(req: NextRequest) {
   const invokeUrl = `${agentcoreUrl}/invoke`
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    const apiKey = process.env.AGENTCORE_API_KEY
+    if (apiKey) {
+      headers['x-api-key'] = apiKey
+    }
+
     const agentResponse = await fetch(invokeUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         bank_id: agentcoreBankId,
         prompt: prompt.trim(),

@@ -55,8 +55,8 @@ CREATE TABLE memory_units (
     occurred_end TIMESTAMPTZ,
     mentioned_at TIMESTAMPTZ,
 
-    -- Full-text search: pg_bigm（日本語 bi-gram 対応）
-    -- text, context カラムに直接 GIN bigm インデックスを作成（下記 Indexes セクション参照）
+    -- Full-text search: pg_trgm（トライグラム全文検索）
+    -- text, context カラムに直接 GIN trgm インデックスを作成（下記 Indexes セクション参照）
 
     -- Observation-specific
     proof_count INTEGER DEFAULT 0,
@@ -120,11 +120,11 @@ CREATE INDEX idx_memory_units_embedding_experience ON memory_units
     WITH (m = 16, ef_construction = 256)
     WHERE fact_type = 'experience' AND embedding IS NOT NULL;
 
--- GIN Index（pg_bigm 全文検索 — 日本語対応）
-CREATE INDEX idx_memory_units_text_bigm ON memory_units
-    USING gin (text gin_bigm_ops);
-CREATE INDEX idx_memory_units_context_bigm ON memory_units
-    USING gin (context gin_bigm_ops);
+-- GIN Index（pg_trgm 全文検索）
+CREATE INDEX idx_memory_units_text_trgm ON memory_units
+    USING gin (text gin_trgm_ops);
+CREATE INDEX idx_memory_units_context_trgm ON memory_units
+    USING gin (context gin_trgm_ops);
 
 -- B-tree Composite: 主検索パターン
 CREATE INDEX idx_memory_units_bank_type_date ON memory_units
