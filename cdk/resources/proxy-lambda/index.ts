@@ -1,5 +1,4 @@
-import { promisify } from 'util';
-import { pipeline as streamPipeline, Readable, Writable } from 'stream';
+import { Readable, Writable } from 'stream';
 import { randomUUID } from 'crypto';
 import type { APIGatewayProxyEvent, Context } from 'aws-lambda';
 import {
@@ -12,9 +11,6 @@ const agentCoreArn = process.env.AGENT_RUNTIME_ARN;
 if (!agentCoreArn) {
   throw new Error('AGENT_RUNTIME_ARN must be set in environment variables');
 }
-
-// ストリームパイプライン処理をPromise化
-const asyncPipeline = promisify(streamPipeline);
 
 // BedrockAgentCoreクライアントの初期化
 const agentCoreClient = new BedrockAgentCoreClient({
@@ -63,11 +59,11 @@ export const handler = awslambda.streamifyResponse(
       // リクエストボディからパラメータを解析
       const requestParams = parseClientRequest(event);
 
-      // Server-Sent Events形式でレスポンスを返す設定
+      // プレーンテキスト形式でレスポンスを返す設定
       const responseMetadata = {
         statusCode: 200,
         headers: {
-          'Content-Type': 'text/event-stream',
+          'Content-Type': 'text/plain; charset=utf-8',
           'Cache-Control': 'no-cache',
           'X-Accel-Buffering': 'no',
         },
@@ -94,8 +90,34 @@ export const handler = awslambda.streamifyResponse(
       // AgentCoreを実行してレスポンスを取得
       const runtimeResponse = await agentCoreClient.send(invokeCommand);
 
-      // レスポンスストリームをクライアントへパイプライン接続
-      await asyncPipeline(runtimeResponse.response as Readable, httpStream);
+      // AgentCore の SSE レスポンスをパースしてプレーンテキストとして転送
+      const agentStream = runtimeResponse.response as Readable;
+      let buffer = '';
+
+      for await (const chunk of agentStream) {
+        buffer += chunk.toString('utf-8');
+        const lines = buffer.split('\n');
+        // 最後の要素は不完全な行の可能性があるため次回に持ち越す
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const raw = line.slice(6);
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (typeof parsed === 'string') {
+                  httpStream.write(parsed);
+                }
+              } catch {
+                httpStream.write(raw);
+              }
+            }
+          }
+        }
+      }
+
+      httpStream.end();
     } catch (error) {
       // エラー情報をストリームに書き込み（JSON.stringify で安全にエスケープ）
       try {

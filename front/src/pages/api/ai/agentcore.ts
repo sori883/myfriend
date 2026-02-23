@@ -119,47 +119,8 @@ export default async function handler(req: NextRequest) {
       )
     }
 
-    if (!agentResponse.body) {
-      return new Response(null, {
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      })
-    }
-
-    // SSE ストリーム (data: chunk\n\n) をパースしてプレーンテキストに変換
-    const reader = agentResponse.body.getReader()
-    const decoder = new TextDecoder()
-    const encoder = new TextEncoder()
-
-    const stream = new ReadableStream({
-      async pull(controller) {
-        const { done, value } = await reader.read()
-        if (done) {
-          controller.close()
-          return
-        }
-
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const raw = line.slice(6)
-            if (raw) {
-              try {
-                const parsed = JSON.parse(raw)
-                if (typeof parsed === 'string') {
-                  controller.enqueue(encoder.encode(parsed))
-                }
-              } catch {
-                // JSON パース失敗時はそのまま転送
-                controller.enqueue(encoder.encode(raw))
-              }
-            }
-          }
-        }
-      },
-    })
-
-    return new Response(stream, {
+    // プレーンテキストストリームをそのままパイプスルー
+    return new Response(agentResponse.body, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
