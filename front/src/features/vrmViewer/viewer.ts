@@ -49,14 +49,30 @@ export class Viewer {
     this._clock.start()
   }
 
-  public loadVrm(url: string) {
+  public async loadVrm(url: string) {
     if (this.model?.vrm) {
       this.unloadVRM()
     }
 
+    // プライベート Blob URL の場合は署名付きダウンロード URL を取得
+    let resolvedUrl = url
+    if (url.includes('.private.blob.vercel-storage.com')) {
+      try {
+        const res = await fetch(
+          `/api/blob-url?url=${encodeURIComponent(url)}`
+        )
+        if (res.ok) {
+          const { downloadUrl } = await res.json()
+          resolvedUrl = downloadUrl
+        }
+      } catch (e) {
+        console.error('Failed to resolve blob URL:', e)
+      }
+    }
+
     // gltf and vrm
     this.model = new Model(this._camera || new THREE.Object3D())
-    this.model.loadVRM(url).then(async () => {
+    this.model.loadVRM(resolvedUrl).then(async () => {
       if (!this.model?.vrm) return
 
       // Disable frustum culling

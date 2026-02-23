@@ -46,6 +46,7 @@
     "@supabase/supabase-js": "^2.89.0",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@vercel/analytics": "^1.6.1",
+    "@vercel/blob": "^2.3.0",
     "ai": "^6.0.6",
     "axios": "^1.6.8",
     "canvas": "^3.2.0",
