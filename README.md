@@ -1,3 +1,44 @@
+# イメージ
+かわいい。
+![かわいい](./image.jpg)
+
+# アーキテクチャ
+
+## システム構成図
+
+```mermaid
+graph TB
+    subgraph Frontend["フロントエンド (Vercel)"]
+        Next["Next.js / AITuberKit"]
+    end
+
+    subgraph AWS["AWS (ap-northeast-1)"]
+        APIGW["API Gateway<br/>REST API + API Key認証"]
+
+        subgraph VPC["VPC (Private Subnet)"]
+            Proxy["Proxy Lambda<br/>Node.js 24<br/>Response Streaming"]
+            AgentCore["Bedrock AgentCore<br/>Strands Agent (Python)"]
+            Aurora["Aurora Serverless v2<br/>PostgreSQL 16.4<br/>pgvector / pg_trgm / AGE"]
+            Batch["Batch Lambda<br/>Python (Docker)"]
+        end
+
+        EventBridge["EventBridge<br/>5分間隔"]
+        Bedrock["Amazon Bedrock"]
+        SecretsManager["Secrets Manager"]
+    end
+
+    Next -->|POST /v1| APIGW
+    APIGW --> Proxy
+    Proxy -->|InvokeAgentRuntime| AgentCore
+    AgentCore -->|recall / retain / reflect| Aurora
+    AgentCore -->|Converse API<br/>Claude Sonnet| Bedrock
+    EventBridge --> Batch
+    Batch -->|Consolidation| Aurora
+    Batch -->|Claude Haiku| Bedrock
+    AgentCore -->|Titan Embed V2<br/>Rerank API| Bedrock
+    Aurora -.->|認証情報| SecretsManager
+```
+
 # 使用方法
 
 ```bash
