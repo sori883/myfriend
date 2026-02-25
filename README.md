@@ -85,6 +85,11 @@ https://mk22.booth.pm/items/5007531
   - フロントエンド
   - 記憶システム
 
+# 記憶システム
+
+- Hindsight
+  - https://arxiv.org/pdf/2512.12818
+
 # 実装マイルストーン
 [x] 記憶保持、検索
 
