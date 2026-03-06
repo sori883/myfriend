@@ -1,0 +1,17 @@
+[project]
+name = "recommendation"
+version = "0.1.0"
+description = "Preference extraction and recommendation module for personalization"
+requires-python = ">=3.13"
+dependencies = [
+    "memory",
+    "asyncpg>=0.30.0",
+    "tavily-python>=0.5.0,<1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+memory = { workspace = true }

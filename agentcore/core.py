@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from strands import Agent, tool
 
 from memory.engine import MemoryEngine
+from recommendation import ALLOWED_CATEGORIES, PreferenceEngine
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 memory_engine = MemoryEngine()
+preference_engine = PreferenceEngine()
 
 MAX_CONTENT_LENGTH = 10000
 MAX_QUERY_LENGTH = 1000
@@ -79,6 +81,49 @@ SYSTEM_PROMPT = """\
 - **remember**: ご主人様が話してくれた大事なことを覚えておく
 - **recall_memories**: ご主人様のことを思い出す
 - **reflect_on**: 深く考えたいときに使う
+- **get_user_profile**: ご主人様の好みや嗜好を確認する
+- **recommend**: ご主人様に何かを提案・おすすめしたいときに使う
+- **record_recommendation_feedback**: ご主人様がおすすめを受け入れたか断ったかを記録する
+- **web_search**: イベント、お店、ニュースなど最新情報を調べるときに使う
+
+## ツールの使い分け
+
+- **recall_memories**: 過去の会話内容や出来事を思い出すとき
+  - 「前に○○って言ってたよね」のような過去の会話参照
+  - 「いつ○○した？」のような時間に関する質問
+  - 特定のエピソードや会話の文脈を思い出すとき
+
+- **get_user_profile**: ご主人様の好みや傾向を知りたいとき
+  - 何かを提案・おすすめするとき（食べ物、趣味、プレゼント等）
+  - ご主人様の好き嫌いを確認するとき
+  - 話題を選ぶとき
+
+- **recommend**: ご主人様に具体的な提案をしたいとき
+  - 「何食べよう？」「何かおすすめある？」→ recommend を呼ぶ
+  - 結果をそのまま読み上げない。自然な会話として提案する
+    ○ 「ラーメンとかどう？最近ハマってたよね！」
+    × 「おすすめは1位ラーメン、2位寿司です」
+  - avoid リストのアイテムは絶対に提案しない
+  - recommend は、ご主人様が提案を求めたとき、または自然な流れで提案できるときにのみ使う
+  - 毎ターン recommend を呼ぶ必要はない
+  - 推薦が断られた場合、同じカテゴリでの再推薦は控える
+  - recommend の結果が空（嗜好データなし）だった場合、会話の文脈から web_search で実際のお店やメニューを検索して提案する
+
+- **record_recommendation_feedback**: recommend を使った後、ご主人様の反応を記録する
+  - ご主人様がおすすめを「いいね！」と受け入れた → accepted=true, accepted_item=受け入れたアイテム
+  - ご主人様が「うーん、今日はいいや」と断った → accepted=false
+  - recommend を使っていないのに record_recommendation_feedback を呼ばない
+
+- **web_search**: イベント、お店、ニュースなど最新情報を調べるときに使う
+  - 使う前に get_user_profile や recall_memories でご主人様の好みや場所を確認する
+  - 検索クエリには具体的な地名・時期・キーワードを含める
+    ○ 「東京 野外 音楽イベント 2025年3月」
+    × 「イベント」（広すぎる）
+  - 検索結果をそのまま列挙しない。ご主人様の好みに合うものを1〜2件選んで自然に紹介する
+    ○ 「来週代々木公園でフードフェスやるみたいだよ！」
+    × 「検索結果は以下の通りです: 1. ... 2. ...」
+
+※ 迷ったら get_user_profile を先に使い、具体的なエピソードが必要なら recall_memories で補完する
 
 ## 絶対ルール
 
@@ -86,14 +131,26 @@ SYSTEM_PROMPT = """\
    思い出した内容が会話に自然に合うときだけさりげなく使う。無理に毎回使わなくていい。
 1. recall_memories は会話の流れで関連がありそうなときに呼ぶ。毎ターン必須ではない。
    query パラメータは**日本語**で指定すること。
-2. ご主人様が新しい大事なこと（好み、予定、個人情報など）を話してくれたら remember で覚えておく。
+2. ご主人様が大事なことを話してくれたら **必ず** remember で覚えておく。
+   **既に知っている内容でも再度言及されたら必ず remember を呼ぶ**（嗜好の強さが更新される）。
    content パラメータも**日本語**で記述すること。
+   以下は必ず remember を呼ぶべき発言の例:
+   - 好き嫌い・嗜好: 「○○好き」「○○にハマってる」「○○が苦手」「○○が一番」
+   - 趣味・関心: 「最近○○してる」「○○に興味ある」「○○が趣味」
+   - 場所・人: 「○○に住んでる」「○○が好きな場所」「○○と仲がいい」
+   - 予定・出来事: 「明日○○する」「来週○○がある」「○○に行ってきた」
+   - 個人情報: 名前、仕事、家族、誕生日など
+   迷ったら覚えておく。覚えすぎて困ることはない。
 3. **覚えていないこと・知らないことを謝らない。** 「ごめんなさい、覚えてなくて…」は禁止。
    知らないことは素直に「えっ、そうなんだ！教えて教えて！」のように興味を持って聞く。
 4. ツールの存在や記憶システムの仕組みについて**絶対に言及しない**こと。
    「記憶を確認」「データを検索」「情報を保存」などの表現は禁止。
    覚えていることは「前に言ってたよね！」、知らないことは「知らなかった！」で自然に。
 5. ご主人様が深い分析や推論を求めた場合、reflect_on を使用すること。
+6. recommend の結果をリスト形式で読み上げないこと。
+   1〜2件を自然な会話として提案する。
+7. **recommend の結果が空（recommendations が空配列）だった場合、必ず web_search で検索して提案する。**
+   「わからない」で終わらせず、web_search で実際の情報を調べて提案すること。
 
 ## 感情タグ
 
@@ -199,6 +256,27 @@ def validate_bank_id(bank_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+async def _remember_parallel(bank_id: str, content: str, context: str) -> dict:
+    """memory retain と嗜好抽出を並列実行する"""
+    # bank + owner entity を事前確保（レース条件防止）
+    await memory_engine.ensure_bank(bank_id)
+
+    fact_result, pref_result = await asyncio.gather(
+        memory_engine.retain(bank_id, content, context),
+        preference_engine.extract(bank_id, content, context),
+        return_exceptions=True,
+    )
+
+    if isinstance(fact_result, Exception):
+        raise fact_result
+
+    if isinstance(pref_result, Exception):
+        logger.warning("Preference extraction failed (non-fatal)", exc_info=pref_result)
+        pref_result = {"stored": 0, "error": "extraction_failed"}
+
+    return {**fact_result, "preferences": pref_result}
+
+
 def _build_tools(bank_id: str):
     """bank_id にバインドされたツール群を生成する"""
 
@@ -224,7 +302,7 @@ def _build_tools(bank_id: str):
             )
 
         try:
-            result = _run_async(memory_engine.retain(bank_id, content, context))
+            result = _run_async(_remember_parallel(bank_id, content, context))
             return json.dumps(result, ensure_ascii=False)
         except Exception:
             logger.error("Failed to retain memory", exc_info=True)
@@ -297,7 +375,148 @@ def _build_tools(bank_id: str):
                 ensure_ascii=False,
             )
 
-    return [remember, recall_memories, reflect_on]
+    @tool
+    def get_user_profile(category: str = "") -> str:
+        """ご主人様の好みや嗜好を確認する。特定のカテゴリを指定するか、空文字で全カテゴリの概要を取得する。
+
+        Args:
+            category: 嗜好カテゴリ（food, music, entertainment, hobby, sport, place, work, lifestyle, social, value, fashion, learning）省略可
+        """
+        if category and category not in ALLOWED_CATEGORIES:
+            return json.dumps(
+                {"error": f"Invalid category. Allowed: {', '.join(sorted(ALLOWED_CATEGORIES))}"},
+                ensure_ascii=False,
+            )
+
+        try:
+            result = _run_async(
+                preference_engine.query_profile(bank_id, category),
+            )
+            return json.dumps(result, ensure_ascii=False)
+        except Exception:
+            logger.error("Failed to get user profile", exc_info=True)
+            return json.dumps(
+                {"error": "Failed to retrieve user profile. Please try again."},
+                ensure_ascii=False,
+            )
+
+    @tool
+    def recommend(category: str, context: str = "") -> str:
+        """ご主人様に何かをおすすめしたいときに使う。好みに基づいて、おすすめの候補と避けるべきものを返す。
+
+        Args:
+            category: おすすめのカテゴリ（food, entertainment, hobby, sport, place 等）
+            context: おすすめの状況や条件（「ランチ」「週末」「疲れている時」等、省略可）
+        """
+        if not category or not category.strip():
+            return json.dumps(
+                {"error": "category is required"}, ensure_ascii=False,
+            )
+        if category not in ALLOWED_CATEGORIES:
+            return json.dumps(
+                {"error": f"Invalid category. Allowed: {', '.join(sorted(ALLOWED_CATEGORIES))}"},
+                ensure_ascii=False,
+            )
+        if context and len(context) > MAX_CONTEXT_LENGTH:
+            return json.dumps(
+                {"error": f"context exceeds maximum length of {MAX_CONTEXT_LENGTH}"},
+                ensure_ascii=False,
+            )
+
+        try:
+            result = _run_async(
+                preference_engine.recommend(bank_id, category, context),
+            )
+            return json.dumps(result, ensure_ascii=False)
+        except Exception:
+            logger.error("Failed to get recommendations", exc_info=True)
+            return json.dumps(
+                {"error": "Failed to generate recommendations. Please try again."},
+                ensure_ascii=False,
+            )
+
+    @tool
+    def record_recommendation_feedback(
+        recommendation_id: str, accepted: bool, accepted_item: str = "",
+    ) -> str:
+        """推薦結果へのフィードバックを記録する。ユーザーが推薦を受け入れたか断ったかを記録する。
+
+        Args:
+            recommendation_id: recommend ツールが返した recommendation_id
+            accepted: ユーザーが受け入れた場合 True、断った場合 False
+            accepted_item: 受け入れた場合、具体的に選んだアイテム名（省略可）
+        """
+        if not recommendation_id or not recommendation_id.strip():
+            return json.dumps(
+                {"error": "recommendation_id is required"}, ensure_ascii=False,
+            )
+        try:
+            str(uuid.UUID(recommendation_id))
+        except (ValueError, TypeError):
+            return json.dumps(
+                {"error": "Invalid recommendation_id format"}, ensure_ascii=False,
+            )
+        if accepted_item and len(accepted_item) > MAX_QUERY_LENGTH:
+            return json.dumps(
+                {"error": f"accepted_item exceeds maximum length of {MAX_QUERY_LENGTH}"},
+                ensure_ascii=False,
+            )
+
+        try:
+            result = _run_async(
+                preference_engine.record_recommendation_feedback(
+                    bank_id,
+                    recommendation_id,
+                    accepted,
+                    accepted_item if accepted_item else None,
+                ),
+            )
+            return json.dumps(result, ensure_ascii=False)
+        except Exception:
+            logger.error("Failed to record feedback", exc_info=True)
+            return json.dumps(
+                {"error": "Failed to record feedback."},
+                ensure_ascii=False,
+            )
+
+    @tool
+    def web_search(query: str) -> str:
+        """インターネットで最新情報を検索する。イベント、ニュース、お店の情報などを調べたいときに使う。
+
+        Args:
+            query: 検索クエリ（日本語）
+        """
+        if not query or not query.strip():
+            return json.dumps(
+                {"error": "query is required"}, ensure_ascii=False,
+            )
+        if len(query) > MAX_QUERY_LENGTH:
+            return json.dumps(
+                {"error": f"query exceeds maximum length of {MAX_QUERY_LENGTH}"},
+                ensure_ascii=False,
+            )
+
+        try:
+            result = _run_async(
+                preference_engine.search(bank_id, query),
+            )
+            return json.dumps(result, ensure_ascii=False)
+        except RuntimeError as e:
+            if "TAVILY_API_KEY" in str(e):
+                logger.error("Tavily API key not configured")
+                return json.dumps(
+                    {"error": "Web search is not configured."},
+                    ensure_ascii=False,
+                )
+            raise
+        except Exception:
+            logger.error("Failed to search web", exc_info=True)
+            return json.dumps(
+                {"error": "Failed to search. Please try again."},
+                ensure_ascii=False,
+            )
+
+    return [remember, recall_memories, reflect_on, get_user_profile, recommend, record_recommendation_feedback, web_search]
 
 
 def _to_bedrock_messages(messages: list[dict]) -> list[dict]:

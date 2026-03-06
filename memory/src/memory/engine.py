@@ -6,7 +6,7 @@ import asyncpg
 from memory.db import close_pool, get_pool
 from memory.recall import recall as _recall
 from memory.reflect import reflect as _reflect
-from memory.retain import retain as _retain
+from memory.retain import ensure_bank_with_owner, retain as _retain
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,11 @@ class MemoryEngine:
         if self._pool is None:
             await self.initialize()
         return self._pool
+
+    async def ensure_bank(self, bank_id: str) -> None:
+        """bank + owner entity の存在を保証する（並列実行前に呼ぶ）"""
+        pool = await self._ensure_pool()
+        await ensure_bank_with_owner(pool, bank_id)
 
     async def retain(
         self,
