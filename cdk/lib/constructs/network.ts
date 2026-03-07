@@ -7,6 +7,7 @@ interface Props {
   readonly maxAzs: number;
   readonly subnetConfigs: ec2.SubnetConfiguration[];
   readonly subnetSelectionName: string;
+  readonly egressSubnetName?: string;
 }
 
 export class Network extends Construct {
@@ -15,11 +16,18 @@ export class Network extends Construct {
   public readonly sgLambda: ec2.ISecurityGroup;
   public readonly sgAurora: ec2.ISecurityGroup;
   public readonly isolatedSubnets: ec2.ISubnet[];
+  public readonly privateSubnets: ec2.ISubnet[];
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
-    const { publicNats, cidr, maxAzs, subnetConfigs, subnetSelectionName } =
+    const { publicNats, cidr, maxAzs, subnetConfigs, subnetSelectionName, egressSubnetName } =
       props;
+
+    if (egressSubnetName && publicNats === 0) {
+      throw new Error(
+        `egressSubnetName "${egressSubnetName}" が指定されていますが、publicNats が 0 のため NAT Gateway がありません。`
+      );
+    }
 
     /**
      * NATが必要か否かでPublicにするか定義
@@ -58,6 +66,11 @@ export class Network extends Construct {
     this.isolatedSubnets = this.vpc.selectSubnets({
       subnetGroupName: subnetSelectionName,
     }).subnets;
+
+    // NAT Gateway 経由でインターネットアクセス可能なサブネット（AgentCore 用）
+    this.privateSubnets = egressSubnetName
+      ? this.vpc.selectSubnets({ subnetGroupName: egressSubnetName }).subnets
+      : this.isolatedSubnets;
 
     /**
      * Security Groups

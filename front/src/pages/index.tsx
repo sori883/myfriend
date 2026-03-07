@@ -16,6 +16,7 @@ import ImageOverlay from '@/components/ImageOverlay'
 import PresenceManager from '@/components/presenceManager'
 import IdleManager from '@/components/idleManager'
 import { KioskOverlay } from '@/features/kiosk/kioskOverlay'
+import { EmotionDebugPanel } from '@/components/emotionDebugPanel'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import '@/lib/i18n'
@@ -132,6 +133,7 @@ const Home = () => {
         <IdleManager />
       </div>
       <KioskOverlay />
+      <EmotionDebugPanel />
     </div>
   )
 }

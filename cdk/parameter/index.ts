@@ -22,7 +22,7 @@ const envDiffParameter = (envName: EnvNameType) => {
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
-        publicNats: 0,
+        publicNats: 1,
         subnets: {
           Private1: {
             name: 'Private1',
@@ -31,7 +31,7 @@ const envDiffParameter = (envName: EnvNameType) => {
           },
           Private2: {
             name: 'Private2',
-            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
             cidrMask: 24,
           },
         },
@@ -57,7 +57,7 @@ const envDiffParameter = (envName: EnvNameType) => {
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
-        publicNats: 0,
+        publicNats: 1,
         subnets: {
           Private1: {
             name: 'Private1',
@@ -66,7 +66,7 @@ const envDiffParameter = (envName: EnvNameType) => {
           },
           Private2: {
             name: 'Private2',
-            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
             cidrMask: 24,
           },
         },
@@ -92,7 +92,7 @@ const envDiffParameter = (envName: EnvNameType) => {
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
-        publicNats: 0,
+        publicNats: 1,
         subnets: {
           Private1: {
             name: 'Private1',
@@ -101,7 +101,7 @@ const envDiffParameter = (envName: EnvNameType) => {
           },
           Private2: {
             name: 'Private2',
-            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
             cidrMask: 24,
           },
         },

@@ -1,4 +1,6 @@
 postgresql/data/
+postgresql/backups/
+postgresql/init/006_seed_data.sql
 reference
 .venv
 __pycache__

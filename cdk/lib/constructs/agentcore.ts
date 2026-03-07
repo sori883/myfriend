@@ -8,11 +8,12 @@ import * as agentcore from '@aws-cdk/aws-bedrock-agentcore-alpha';
 
 interface Props {
   readonly vpc: ec2.IVpc;
-  readonly isolatedSubnets: ec2.ISubnet[];
+  readonly privateSubnets: ec2.ISubnet[];
   readonly auroraSecurityGroup: ec2.ISecurityGroup;
   readonly dbSecret: secretsmanager.ISecret;
   readonly dbHost: string;
   readonly databaseName: string;
+  readonly runtimeEnv: Record<string, string>;
 }
 
 export class AgentCore extends Construct {
@@ -20,7 +21,7 @@ export class AgentCore extends Construct {
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
-    const { vpc, isolatedSubnets, auroraSecurityGroup, dbSecret, dbHost, databaseName } = props;
+    const { vpc, privateSubnets, auroraSecurityGroup, dbSecret, dbHost, databaseName, runtimeEnv } = props;
 
     // AgentCore Runtime Artifact（ビルドコンテキスト: リポジトリルート）
     const artifact = agentcore.AgentRuntimeArtifact.fromAsset(
@@ -49,13 +50,14 @@ export class AgentCore extends Construct {
       description: 'Myfriend AI agent with memory system',
       networkConfiguration: agentcore.RuntimeNetworkConfiguration.usingVpc(this, {
         vpc: vpc as ec2.Vpc,
-        vpcSubnets: { subnets: isolatedSubnets },
+        vpcSubnets: { subnets: privateSubnets },
       }),
       environmentVariables: {
         AWS_REGION: cdk.Stack.of(this).region,
         DB_SECRET_ARN: dbSecret.secretArn,
         DB_HOST: dbHost,
         DB_NAME: databaseName,
+        ...runtimeEnv,
       },
     });
 

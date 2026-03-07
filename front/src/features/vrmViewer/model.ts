@@ -120,5 +120,8 @@ export class Model {
     }
 
     this.vrm?.update(delta)
+
+    // 追加ブレンドシェイプを強制適用（vrm.update() の override 処理後に上書き）
+    this.emoteController?.applyExtraExpressions()
   }
 }

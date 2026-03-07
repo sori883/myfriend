@@ -41,4 +41,11 @@ export class EmoteController {
   public applyGesture(vrm: VRM) {
     this._motionController.applyGesture(vrm)
   }
+
+  /**
+   * vrm.update() の後に呼び出し、追加ブレンドシェイプを強制適用する
+   */
+  public applyExtraExpressions() {
+    this._expressionController.applyExtraExpressions()
+  }
 }

@@ -3,9 +3,8 @@ import { VRM, VRMHumanBoneName } from '@pixiv/three-vrm'
 import { EmotionType } from '@/features/messages/messages'
 import {
   GESTURE_POSES,
-  GESTURE_SLERP_SPEED,
-  BREATHING,
-  IDLE_SWAY,
+  EMOTION_MOTION_CONFIG,
+  type OscillationDef,
 } from './motionConstants'
 
 const DEG2RAD = Math.PI / 180
@@ -25,11 +24,11 @@ const eulerDegToQuat = (
  * 感情に応じたボディジェスチャーを制御するクラス
  *
  * idle_loop.vrma のアイドルアニメーション上に、
- * 小さな回転オフセットを加算する。
+ * 回転オフセットを加算する。
  * AnimationMixer.update() の後、vrm.update() の前に applyGesture() を呼ぶ。
  *
- * mixer がアニメーションしないボーンでの回転累積を防ぐため、
- * 初回アクセス時にベースクォータニオンを保存し、
+ * mixer がアニメーションしないボーンでの累積を防ぐため、
+ * 初回アクセス時にベース値を保存し、
  * 毎フレーム「ベース → ジェスチャー → オシレーション」の順で上書きする。
  */
 export class MotionController {
@@ -40,6 +39,10 @@ export class MotionController {
 
   /** 初回アクセス時のボーンクォータニオン（累積防止用） */
   private _baseQuats: Map<VRMHumanBoneName, THREE.Quaternion>
+  /** 現在の感情に対応するオシレーション定義 */
+  private _currentOscillations: readonly OscillationDef[]
+  /** 現在の感情に対応するSLERP補間速度 */
+  private _slerpSpeed: number
 
   // _applyOscillation 用の再利用オブジェクト（同期呼び出しのため安全）
   private _tempQuat: THREE.Quaternion
@@ -58,6 +61,11 @@ export class MotionController {
     this._elapsedTime = 0
     this._tempQuat = new THREE.Quaternion()
     this._tempEuler = new THREE.Euler()
+
+    // 初期状態は neutral
+    const neutralConfig = EMOTION_MOTION_CONFIG.neutral
+    this._currentOscillations = neutralConfig.oscillations
+    this._slerpSpeed = neutralConfig.slerpSpeed
   }
 
   /** 目標の感情ポーズを設定（遷移は update() でスムーズに行われる） */
@@ -84,11 +92,22 @@ export class MotionController {
     }
 
     this._targetRotations = newTargets
+
+    // 感情別モーション設定を適用
+    const config = EMOTION_MOTION_CONFIG[emotion]
+    if (config) {
+      this._currentOscillations = config.oscillations
+      this._slerpSpeed = config.slerpSpeed
+    }
   }
 
   /** 内部補間を進める（毎フレーム呼び出し） */
   public update(delta: number): void {
     this._elapsedTime += delta
+    // 浮動小数点精度劣化を防止（全周波数の周期が収まる十分大きな値でmod）
+    if (this._elapsedTime > 1000) {
+      this._elapsedTime -= 1000
+    }
 
     for (const [bone, target] of this._targetRotations) {
       let current = this._currentRotations.get(bone)
@@ -96,58 +115,60 @@ export class MotionController {
         current = new THREE.Quaternion()
         this._currentRotations.set(bone, current)
       }
-      current.slerp(target, 1 - Math.exp(-GESTURE_SLERP_SPEED * delta))
+      current.slerp(target, 1 - Math.exp(-this._slerpSpeed * delta))
     }
   }
 
   /**
-   * ボーンにジェスチャー回転を加算適用する
+   * ボーンにジェスチャーを適用する
    * mixer.update() の後、vrm.update() の前に呼ぶこと
    */
   public applyGesture(vrm: VRM): void {
     const humanoid = vrm.humanoid
     if (!humanoid) return
 
-    // 1. 全対象ボーンをベースクォータニオンにリセット
-    //    （mixer がアニメーションしないボーンでの回転累積を防止）
-    const allBones: VRMHumanBoneName[] = [
-      ...this._currentRotations.keys(),
-      BREATHING.bone,
-      IDLE_SWAY.bone,
-    ]
-
-    for (const boneName of allBones) {
-      const boneNode = humanoid.getNormalizedBoneNode(boneName)
-      if (!boneNode) continue
-
-      if (!this._baseQuats.has(boneName)) {
-        this._baseQuats.set(boneName, boneNode.quaternion.clone())
-      }
-      boneNode.quaternion.copy(this._baseQuats.get(boneName)!)
+    // 1. ジェスチャー対象ボーンをベースクォータニオンにリセット
+    for (const boneName of this._currentRotations.keys()) {
+      this._resetBoneQuat(humanoid, boneName)
     }
 
-    // 2. ジェスチャーオフセットを乗算
+    // 2. 回転オシレーション対象ボーンもベースにリセット
+    for (const osc of this._currentOscillations) {
+      this._resetBoneQuat(humanoid, osc.bone)
+    }
+
+    // 3. ジェスチャーオフセットを乗算
     for (const [boneName, offset] of this._currentRotations) {
       const boneNode = humanoid.getNormalizedBoneNode(boneName)
       if (!boneNode) continue
       boneNode.quaternion.multiply(offset)
     }
 
-    // 3. オシレーション（呼吸・揺れ）を乗算
-    this._applyOscillation(
-      humanoid,
-      BREATHING.bone,
-      BREATHING.axis,
-      BREATHING.amplitudeDeg,
-      BREATHING.frequencyHz
-    )
-    this._applyOscillation(
-      humanoid,
-      IDLE_SWAY.bone,
-      IDLE_SWAY.axis,
-      IDLE_SWAY.amplitudeDeg,
-      IDLE_SWAY.frequencyHz
-    )
+    // 4. 回転オシレーションを乗算
+    for (const osc of this._currentOscillations) {
+      this._applyOscillation(
+        humanoid,
+        osc.bone,
+        osc.axis,
+        osc.amplitudeDeg,
+        osc.frequencyHz
+      )
+    }
+
+  }
+
+  /** ボーンのクォータニオンをベースにリセット（重複呼び出しは安全） */
+  private _resetBoneQuat(
+    humanoid: VRM['humanoid'],
+    boneName: VRMHumanBoneName
+  ): void {
+    const boneNode = humanoid.getNormalizedBoneNode(boneName)
+    if (!boneNode) return
+
+    if (!this._baseQuats.has(boneName)) {
+      this._baseQuats.set(boneName, boneNode.quaternion.clone())
+    }
+    boneNode.quaternion.copy(this._baseQuats.get(boneName)!)
   }
 
   private _applyOscillation(
@@ -172,4 +193,5 @@ export class MotionController {
     this._tempQuat.setFromEuler(this._tempEuler)
     boneNode.quaternion.multiply(this._tempQuat)
   }
+
 }
