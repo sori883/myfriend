@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import type * as ec2 from 'aws-cdk-lib/aws-ec2';
@@ -5,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import type * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
@@ -15,6 +17,7 @@ interface Props {
   readonly dbSecret: secretsmanager.ISecret;
   readonly cluster: rds.IDatabaseCluster;
   readonly databaseName: string;
+  readonly backupDir?: string;
 }
 
 export class Restore extends Construct {
@@ -30,6 +33,7 @@ export class Restore extends Construct {
       dbSecret,
       cluster,
       databaseName,
+      backupDir,
     } = props;
 
     // リストア用 S3 バケット
@@ -83,6 +87,15 @@ export class Restore extends Construct {
     restoreFunction.node.addDependency(cluster as unknown as Construct);
 
     this.function = restoreFunction;
+
+    // デプロイ時にバックアップファイルを S3 にアップロード
+    if (backupDir && fs.existsSync(backupDir)) {
+      new s3deploy.BucketDeployment(this, 'BackupDeployment', {
+        sources: [s3deploy.Source.asset(backupDir)],
+        destinationBucket: this.bucket,
+        prune: false,
+      });
+    }
 
     // バケット名を出力
     new cdk.CfnOutput(this, 'RestoreBucketName', {

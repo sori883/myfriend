@@ -66,9 +66,9 @@ RESTORE_FUNC  := myfriend-db-restore
 db-backup:
 	@mkdir -p $(BACKUP_DIR)
 	docker exec $(CONTAINER) pg_dump -U $(DB_USER) -d $(DB_NAME) \
-		--data-only --no-owner --no-privileges \
-		--disable-triggers \
+		--data-only --inserts --no-owner --no-privileges \
 		--exclude-table='_migration_history' \
+		--exclude-table='ag_catalog.*' \
 		> $(BACKUP_DIR)/backup_$(TIMESTAMP).sql
 	@echo "Backup saved: $(BACKUP_DIR)/backup_$(TIMESTAMP).sql"
 
@@ -102,50 +102,9 @@ db-restore-file:
 	docker exec -i $(CONTAINER) psql -U $(DB_USER) -d $(DB_NAME) < $(FILE)
 	@echo "Restore complete"
 
-## バックアップを初期データとして配置（db-reset 時に自動投入される）
-db-seed:
-	@LATEST=$$(ls -t $(BACKUP_DIR)/backup_*.sql 2>/dev/null | head -1); \
-	if [ -z "$$LATEST" ]; then \
-		echo "Error: No backup files found in $(BACKUP_DIR)/"; \
-		exit 1; \
-	fi; \
-	cp "$$LATEST" postgresql/init/006_seed_data.sql; \
-	echo "Seed data created: postgresql/init/006_seed_data.sql"; \
-	echo "Run 'make db-reset' to apply"
-
 ## バックアップ一覧を表示
 db-backup-list:
 	@ls -lh $(BACKUP_DIR)/*.sql 2>/dev/null || echo "No backups found in $(BACKUP_DIR)/"
-
-## SQLバックアップをAWS Auroraにリストア（最新 or FILE=指定）
-aws-restore:
-	@if [ -n "$(FILE)" ]; then \
-		SQL_FILE="$(FILE)"; \
-	else \
-		SQL_FILE=$$(ls -t $(BACKUP_DIR)/backup_*.sql 2>/dev/null | head -1); \
-	fi; \
-	if [ -z "$$SQL_FILE" ]; then \
-		echo "Error: No backup files found. Run 'make db-backup' first or specify FILE=path"; \
-		exit 1; \
-	fi; \
-	BUCKET=$$(aws cloudformation describe-stacks \
-		--stack-name $(STACK_NAME) \
-		--query "Stacks[0].Outputs[?contains(OutputKey,'RestoreBucketName')].OutputValue" \
-		--output text); \
-	if [ -z "$$BUCKET" ]; then \
-		echo "Error: Could not find restore bucket. Deploy CDK first."; \
-		exit 1; \
-	fi; \
-	KEY=$$(basename "$$SQL_FILE"); \
-	echo "Uploading $$SQL_FILE to s3://$$BUCKET/$$KEY ..."; \
-	aws s3 cp "$$SQL_FILE" "s3://$$BUCKET/$$KEY"; \
-	echo "Invoking Lambda $(RESTORE_FUNC) ..."; \
-	aws lambda invoke \
-		--function-name $(RESTORE_FUNC) \
-		--payload "$$(printf '{"key":"%s"}' "$$KEY")" \
-		--cli-binary-format raw-in-base64-out \
-		/dev/stdout; \
-	echo ""
 
 # ---------------------------------------------------------------------------
 # ログ・状態確認

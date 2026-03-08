@@ -1,3 +1,4 @@
+import * as path from 'path';
 import type { Construct } from 'constructs';
 import * as cdk from 'aws-cdk-lib';
 
@@ -60,6 +61,7 @@ export class MainStack extends cdk.Stack {
       dbSecret: database.secret,
       cluster: database.cluster,
       databaseName: database.databaseName,
+      backupDir: path.join(__dirname, '../../postgresql/backups'),
     });
 
     // 5. AgentCore（Runtime + Bedrock 権限 + DB 権限 + VPC モード）

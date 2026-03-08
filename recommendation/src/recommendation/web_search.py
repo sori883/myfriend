@@ -151,6 +151,7 @@ def _call_tavily(query: str) -> dict:
         max_results=MAX_SEARCH_RESULTS,
         search_depth="basic",
         topic="general",
+        country="japan",
     )
     return response
 

@@ -38,6 +38,7 @@ export class AgentCore extends Construct {
           'agentcore/.venv',
           'agentcore/.env.local',
           'memory/.venv',
+          'recommendation/.venv',
           'batch/.venv',
         ],
       }

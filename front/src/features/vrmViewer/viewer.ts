@@ -56,14 +56,16 @@ export class Viewer {
       this.unloadVRM()
     }
 
-    // プライベート Blob URL の場合は暗号化プロキシ経由でアクセス
-    const resolvedUrl = url.includes('.private.blob.vercel-storage.com')
-      ? await this._resolveEncryptedBlobUrl(url)
-      : url
+    try {
+      // プライベート Blob URL の場合は暗号化プロキシ経由でアクセス
+      const resolvedUrl = url.includes('.private.blob.vercel-storage.com')
+        ? await this._resolveEncryptedBlobUrl(url)
+        : url
 
-    // gltf and vrm
-    this.model = new Model(this._camera || new THREE.Object3D())
-    this.model.loadVRM(resolvedUrl).then(async () => {
+      // gltf and vrm
+      this.model = new Model(this._camera || new THREE.Object3D())
+      await this.model.loadVRM(resolvedUrl)
+
       if (!this.model?.vrm) return
 
       // Disable frustum culling
@@ -80,7 +82,9 @@ export class Viewer {
       requestAnimationFrame(() => {
         this.resetCamera()
       })
-    })
+    } catch (error) {
+      console.error('VRM loading failed:', error)
+    }
   }
 
   /**
@@ -101,10 +105,13 @@ export class Viewer {
 
     if (isEncrypted) {
       const encryptedData = await response.arrayBuffer()
+      // blob-url.ts が暗号化に使用した ETag を blob-key に渡して鍵の一致を保証
+      const etag = response.headers.get('X-Blob-ETag') ?? ''
 
-      const keyResponse = await fetch(
-        `/api/blob-key?url=${encodeURIComponent(originalUrl)}`
-      )
+      const keyUrl =
+        `/api/blob-key?url=${encodeURIComponent(originalUrl)}` +
+        `&etag=${encodeURIComponent(etag)}`
+      const keyResponse = await fetch(keyUrl)
       if (!keyResponse.ok) {
         throw new Error(`Key fetch failed: ${keyResponse.status}`)
       }

@@ -1,8 +1,8 @@
 """テスト用ペルソナ発話データの自動DB登録スクリプト
 
-docs/ペルソナ/ユーザー発話.md の発話を1行ずつ順番に
+docs/ペルソナ/ユーザー発話.md の発話を段落（空行区切り）ごとに
 retain（記憶抽出）→ preference extract（嗜好抽出）の順で同期的にDBに投入する。
-一連の会話として処理するため、行間にウェイトを入れてスロットリングを回避する。
+一連の会話として処理するため、段落間にウェイトを入れてスロットリングを回避する。
 
 Usage:
     cd agentcore
@@ -41,9 +41,20 @@ OPERATION_TIMEOUT = 60
 
 
 def parse_utterances(file_path: Path) -> list[str]:
-    """発話ファイルを1行ずつリストに分割する（空行はスキップ）"""
+    """発話ファイルを段落（空行区切り）ごとにリストに分割する"""
     text = file_path.read_text(encoding="utf-8")
-    return [line.strip() for line in text.splitlines() if line.strip()]
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            current.append(stripped)
+        elif current:
+            paragraphs.append("\n".join(current))
+            current = []
+    if current:
+        paragraphs.append("\n".join(current))
+    return paragraphs
 
 
 async def seed(bank_id: str, file_path: Path) -> None:
@@ -55,7 +66,7 @@ async def seed(bank_id: str, file_path: Path) -> None:
 
     logger.info("bank_id: %s", bank_id)
     logger.info("発話ファイル: %s", file_path)
-    logger.info("発話行数: %d", len(lines))
+    logger.info("段落数: %d", len(lines))
 
     memory_engine = MemoryEngine()
     preference_engine = PreferenceEngine()
@@ -69,7 +80,7 @@ async def seed(bank_id: str, file_path: Path) -> None:
         errors = 0
 
         for i, line in enumerate(lines, 1):
-            logger.info("--- [%d/%d] %s ---", i, len(lines), line[:60])
+            logger.info("--- [%d/%d] %s... ---", i, len(lines), line.split("\n")[0][:60])
 
             # retain → preference extract の順で同期的に実行
             try:
