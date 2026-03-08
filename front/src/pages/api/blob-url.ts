@@ -79,7 +79,7 @@ export default async function handler(
 
       res.setHeader('Content-Type', 'application/octet-stream')
       res.setHeader('X-Blob-Encrypted', 'aes-256-gcm')
-      res.setHeader('Cache-Control', 'private, no-store')
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
       return res.send(Buffer.from(encrypted))
     }
 
