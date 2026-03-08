@@ -74,19 +74,12 @@ export default async function handler(
     const encryptionSecret = process.env.BLOB_ENCRYPTION_SECRET
 
     if (encryptionSecret) {
-      const etag = blobResponse.headers.get('etag') ?? ''
       const rawData = await blobResponse.arrayBuffer()
-      const { encrypted } = await encryptData(
-        rawData,
-        encryptionSecret,
-        url,
-        etag
-      )
+      const { encrypted } = await encryptData(rawData, encryptionSecret, url)
 
       res.setHeader('Content-Type', 'application/octet-stream')
       res.setHeader('X-Blob-Encrypted', 'aes-256-gcm')
-      res.setHeader('X-Blob-ETag', etag)
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      res.setHeader('Cache-Control', 'private, no-store')
       return res.send(Buffer.from(encrypted))
     }
 

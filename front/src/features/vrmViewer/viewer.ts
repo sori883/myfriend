@@ -105,13 +105,10 @@ export class Viewer {
 
     if (isEncrypted) {
       const encryptedData = await response.arrayBuffer()
-      // blob-url.ts が暗号化に使用した ETag を blob-key に渡して鍵の一致を保証
-      const etag = response.headers.get('X-Blob-ETag') ?? ''
 
-      const keyUrl =
-        `/api/blob-key?url=${encodeURIComponent(originalUrl)}` +
-        `&etag=${encodeURIComponent(etag)}`
-      const keyResponse = await fetch(keyUrl)
+      const keyResponse = await fetch(
+        `/api/blob-key?url=${encodeURIComponent(originalUrl)}`
+      )
       if (!keyResponse.ok) {
         throw new Error(`Key fetch failed: ${keyResponse.status}`)
       }

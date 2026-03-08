@@ -1,15 +1,14 @@
 /**
  * Blob暗号化ユーティリティ（サーバーサイド / Edge Runtime対応）
  *
- * BLOB_ENCRYPTION_SECRET + blob URLパスから決定的にAES-256キーとIVを導出し、
+ * BLOB_ENCRYPTION_SECRET + blob URLから決定的にAES-256キーとIVを導出し、
  * VRMデータをAES-GCMで暗号化する。
  * 同じURL + 同じシークレットからは常に同じキー/IVが生成されるため、
  * 暗号化済みレスポンスのCDNキャッシュが有効。
  *
- * SECURITY INVARIANT: 決定的な(key, IV)ペアを生成するため、
- * Vercel BlobのURLが不変（content-addressed）であることが前提。
- * 同一URLで内容が変わるとAES-GCM nonce再利用が発生し暗号が破られる。
- * ETagをキー導出に含めることで、内容変更時の安全性を確保する。
+ * キー導出には URL のみを使用する（ETag は使用しない）。
+ * VRM ファイルを差し替える場合は BLOB_ENCRYPTION_SECRET をローテーションするか、
+ * 別の URL にアップロードすること。
  */
 
 import { arrayBufferToBase64 } from '@/utils/encoding'
@@ -35,13 +34,11 @@ async function hmacSha256(
 
 export async function deriveKeyAndIv(
   secret: string,
-  blobUrl: string,
-  etag: string = ''
+  blobUrl: string
 ): Promise<{ rawKey: ArrayBuffer; iv: Uint8Array }> {
-  const material = `${blobUrl}:${etag}`
-  const rawKey = await hmacSha256(secret, `blob-key:${material}`)
+  const rawKey = await hmacSha256(secret, `blob-key:${blobUrl}`)
 
-  const ivSource = await hmacSha256(secret, `blob-iv:${material}`)
+  const ivSource = await hmacSha256(secret, `blob-iv:${blobUrl}`)
   const iv = new Uint8Array(ivSource).slice(0, IV_LENGTH)
 
   return { rawKey, iv }
@@ -50,10 +47,9 @@ export async function deriveKeyAndIv(
 export async function encryptData(
   data: ArrayBuffer,
   secret: string,
-  blobUrl: string,
-  etag: string = ''
+  blobUrl: string
 ): Promise<{ encrypted: ArrayBuffer; iv: Uint8Array }> {
-  const { rawKey, iv } = await deriveKeyAndIv(secret, blobUrl, etag)
+  const { rawKey, iv } = await deriveKeyAndIv(secret, blobUrl)
 
   const cryptoKey = await crypto.subtle.importKey(
     'raw',

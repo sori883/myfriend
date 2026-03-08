@@ -10,8 +10,7 @@ export const config = { runtime: 'edge' }
  * ミドルウェア認証（middleware.ts）で保護済み。
  * Cache-Control: no-store で、キーがCDNやブラウザにキャッシュされることを防ぐ。
  *
- * blob-url.ts が暗号化時に使用した ETag を etag クエリパラメータで受け取り、
- * 同じキーを導出する。etag が未指定の場合は HEAD リクエストで取得する。
+ * blob-url.ts と同じ URL + BLOB_ENCRYPTION_SECRET からキーを導出する。
  */
 export default async function handler(req: NextRequest) {
   if (req.method !== 'GET') {
@@ -44,33 +43,8 @@ export default async function handler(req: NextRequest) {
     )
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN
-  if (!token) {
-    return new Response(
-      JSON.stringify({ error: 'Blob token not configured' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-
   try {
-    // クライアントから ETag が渡された場合はそのまま使用（blob-url.ts と確実に一致）
-    // 渡されなかった場合は HEAD リクエストで取得（後方互換）
-    const clientEtag = req.nextUrl.searchParams.get('etag')
-    let etag: string
-
-    if (clientEtag !== null) {
-      etag = clientEtag
-    } else {
-      const blobResponse = await fetch(url, {
-        method: 'HEAD',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      etag = blobResponse.ok
-        ? (blobResponse.headers.get('etag') ?? '')
-        : ''
-    }
-
-    const { rawKey, iv } = await deriveKeyAndIv(encryptionSecret, url, etag)
+    const { rawKey, iv } = await deriveKeyAndIv(encryptionSecret, url)
 
     return new Response(
       JSON.stringify({
