@@ -158,9 +158,87 @@ make dev
 
 ## デプロイ (CDK)
 
+### 1. 環境変数の設定
+
+`cdk/.env.dev` を作成し、必要な値を設定する（[cdk/.env.dev](#cdkenvdevデプロイ時のみ) 参照）。
+
+### 2. CDK デプロイ
+
 ```bash
-pnpm cdk:dev deploy
+cd cdk && pnpm cdk:dev deploy
 ```
+
+デプロイ時に以下が自動実行される:
+
+| 処理 | 内容 |
+|------|------|
+| Network | VPC・セキュリティグループ・VPC Endpoints の作成 |
+| Database | Aurora Serverless v2 (PostgreSQL 16.4) + Secrets Manager の作成 |
+| Migration | Custom Resource Lambda でスキーマ作成（SQL マイグレーション自動実行） |
+| Restore | リストア用 S3 バケット + Lambda の作成 |
+| AgentCore | Bedrock AgentCore Runtime の作成 |
+| ProxyLambda | Response Streaming 用 Lambda の作成 |
+| ApiGateway | REST API + API Key 認証の作成 |
+| Batch | EventBridge + Consolidation Lambda の作成 |
+
+デプロイ完了後、CloudFormation Outputs に以下が出力される:
+
+- **RestoreBucketName** — リストア用 S3 バケット名
+- **ApiKeyId** — API Gateway の API Key ID
+
+### 3. データベースリストア
+
+CDK デプロイではスキーマのみ作成されるため、既存データを移行する場合は以下の手順でリストアする。
+
+#### 3-1. ローカルでバックアップを取得
+
+```bash
+make db-backup
+```
+
+`postgresql/backups/backup_YYYYMMDD_HHMMSS.sql` にデータのみのバックアップが保存される。
+
+#### 3-2. バックアップファイルを S3 にアップロード
+
+```bash
+# バケット名は CloudFormation Outputs の RestoreBucketName を参照
+aws s3 cp postgresql/backups/backup_YYYYMMDD_HHMMSS.sql \
+  s3://myfriend-db-restore-<ACCOUNT_ID>/backup_YYYYMMDD_HHMMSS.sql
+```
+
+> **Note:** `postgresql/backups/` にファイルがある状態で `cdk deploy` すると、S3 バケットに自動アップロードされる。手動アップロードが不要な場合はこちらを利用する。
+
+#### 3-3. Restore Lambda を実行
+
+1. AWS マネジメントコンソールで **Lambda > 関数 > `myfriend-db-restore`** を開く
+2. **テスト** タブを選択
+3. テストイベントに以下の JSON を入力する
+
+```json
+{
+  "key": "backup_YYYYMMDD_HHMMSS.sql"
+}
+```
+
+4. **テスト** ボタンをクリックして実行する（タイムアウト: 15分）
+
+Lambda が以下を自動実行する:
+
+1. S3 からバックアップファイルをダウンロード
+2. 全テーブルを TRUNCATE（`_migration_history` を除く）
+3. FK 制約を一時的に DROP（循環参照対策）
+4. SQL を実行してデータをリストア
+5. FK 制約を復元
+
+#### 3-4. API Key の取得
+
+```bash
+# ApiKeyId は CloudFormation Outputs の値を使用
+aws apigateway get-api-key --api-key <API_KEY_ID> --include-value \
+  --query 'value' --output text
+```
+
+取得した API Key をフロントエンドの `AGENTCORE_API_KEY` に設定する。
 
 # モデル
 
