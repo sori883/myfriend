@@ -99,7 +99,7 @@ sequenceDiagram
 |----------------|------|
 | AI フレームワーク | Strands Agent (Python) |
 | LLM (Fact 抽出/Consolidation) | AWS Bedrock - Claude Haiku 4.5 |
-| LLM (Reflect) | AWS Bedrock - Claude Sonnet |
+| LLM (Reflect) | AWS Bedrock - Claude Haiku（環境変数で変更可能） |
 | Embedding | AWS Bedrock - Titan Embed V2 (1024次元) |
 | リランキング | AWS Bedrock - Rerank API |
 | データベース | PostgreSQL + pgvector + pg_trgm |
@@ -115,7 +115,7 @@ memory/src/memory/
   reflect.py         # Reflect パイプライン (エージェントループ)
   extraction.py      # LLM Fact 抽出
   embedding.py       # Embedding 生成 (Titan Embed V2)
-  entity.py          # エンティティ解決 (pg_trgm)
+  entity.py          # エンティティ解決 (3要素スコアリング)
   graph.py           # グラフリンク構築
   graph_search.py    # MPFP グラフ検索
   temporal_search.py # 時間範囲検索
@@ -137,10 +137,14 @@ erDiagram
     banks ||--o{ entities : "has"
     banks ||--o{ mental_models : "has"
     banks ||--o{ memory_links : "has"
+    banks ||--o{ documents : "has"
+    banks ||--o{ async_operations : "has"
 
+    documents ||--o{ memory_units : "source"
     memory_units ||--o{ unit_entities : "linked"
     entities ||--o{ unit_entities : "linked"
     memory_units ||--o{ memory_links : "from/to"
+    entities ||--o{ memory_links : "referenced"
     memory_units ||--o{ chunks : "has"
     entities ||--o{ mental_models : "referenced"
 
@@ -148,13 +152,24 @@ erDiagram
         uuid id PK
         text name
         text mission
+        text background
         jsonb disposition
         text[] directives
+        jsonb metadata
+    }
+
+    documents {
+        uuid id PK
+        uuid bank_id FK
+        text external_id
+        text content_hash
+        jsonb metadata
     }
 
     memory_units {
         uuid id PK
         uuid bank_id FK
+        uuid document_id FK
         text text
         vector embedding "1024dim"
         text fact_type "world|experience|observation"
@@ -165,13 +180,17 @@ erDiagram
         uuid[] source_memory_ids "Observation用"
         text freshness_status "鮮度"
         timestamptz consolidated_at
+        jsonb metadata
     }
 
     entities {
         uuid id PK
         uuid bank_id FK
         text canonical_name
-        text entity_type
+        text entity_type "NOT NULL + CHECK"
+        jsonb metadata
+        timestamptz first_seen
+        timestamptz last_seen
         int mention_count
     }
 
@@ -180,6 +199,7 @@ erDiagram
         uuid from_unit_id FK
         uuid to_unit_id FK
         text link_type "temporal|semantic|entity|..."
+        uuid entity_id FK
         float weight
     }
 
@@ -204,6 +224,15 @@ erDiagram
     unit_entities {
         uuid unit_id FK
         uuid entity_id FK
+    }
+
+    async_operations {
+        uuid id PK
+        uuid bank_id FK
+        text operation_type
+        text status "pending|processing|completed|failed"
+        jsonb payload
+        jsonb result
     }
 ```
 

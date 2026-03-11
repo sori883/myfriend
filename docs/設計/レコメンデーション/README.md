@@ -233,10 +233,16 @@ CREATE TABLE preference_profiles (
     entity_id UUID NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
 
     -- 構造化嗜好
-    category TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN (
+        'food', 'music', 'entertainment', 'hobby', 'sport',
+        'place', 'work', 'lifestyle', 'social', 'value',
+        'fashion', 'learning'
+    )),
     item TEXT NOT NULL,
-    sentiment TEXT NOT NULL DEFAULT 'positive',
-    intensity FLOAT NOT NULL DEFAULT 0.5,
+    sentiment TEXT NOT NULL DEFAULT 'positive' CHECK (sentiment IN (
+        'positive', 'negative', 'neutral'
+    )),
+    intensity FLOAT NOT NULL DEFAULT 0.5 CHECK (intensity >= 0.0 AND intensity <= 1.0),
     context TEXT,
 
     -- 証拠
@@ -260,9 +266,18 @@ CREATE INDEX idx_pref_bank_entity
 CREATE INDEX idx_pref_category
     ON preference_profiles(bank_id, entity_id, category);
 
+-- item 名寄せ用 pg_trgm GIN インデックス
+CREATE INDEX idx_pref_item_trgm
+    ON preference_profiles USING gin (item gin_trgm_ops);
+
 -- banks テーブル拡張
 ALTER TABLE banks
     ADD COLUMN IF NOT EXISTS owner_entity_id UUID REFERENCES entities(id);
+
+-- updated_at 自動更新トリガー
+CREATE TRIGGER update_preference_profiles_updated_at
+    BEFORE UPDATE ON preference_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
 ### 5.2 ER 図
@@ -302,17 +317,17 @@ INSERT INTO preference_profiles
     (bank_id, entity_id, category, item, sentiment, intensity,
      source_memory_ids, evidence_count,
      first_mentioned_at, last_mentioned_at)
-VALUES ($1, $2, $3, $4, $5, $6, ARRAY[$7], 1, NOW(), NOW())
+VALUES ($1, $2, $3, $4, $5, $6, ARRAY[]::uuid[], 1, NOW(), NOW())
 ON CONFLICT (bank_id, entity_id, category, item) DO UPDATE SET
     sentiment = EXCLUDED.sentiment,
-    intensity = preference_profiles.intensity * 0.7 + EXCLUDED.intensity * 0.3,
-    source_memory_ids = array_cat(
-        preference_profiles.source_memory_ids, EXCLUDED.source_memory_ids
-    ),
+    intensity = preference_profiles.intensity * $7
+              + EXCLUDED.intensity * $8,
     evidence_count = preference_profiles.evidence_count + 1,
     last_mentioned_at = NOW(),
     updated_at = NOW();
 ```
+
+$7, $8 は EMA の重み（0.7 と 0.3）。source_memory_ids は空配列として初期化される。
 
 ### 6.2 intensity 更新ルール
 
@@ -447,20 +462,21 @@ Claude 3 Haiku（$0.25/1M input, $1.25/1M output）で試算。
 
 | コンポーネント | モデル | 月間コスト | 割合 |
 |---------------|--------|-----------|------|
-| Fact 抽出 | Haiku | ~$0.54 | 9% |
-| Consolidation 判定 | Haiku | ~$0.54 | 9% |
-| Reflect | **Sonnet** | ~$4.50 | **75%** |
-| Embedding | Titan | ~$0.18 | 3% |
-| **嗜好分類（追加）** | **Haiku** | **~$0.24** | **4%** |
-| **合計** | | **~$6.00** | |
+| Fact 抽出 | Haiku | ~$0.54 | 26% |
+| Consolidation 判定 | Haiku | ~$0.54 | 26% |
+| Reflect | **Haiku** | ~$0.54 | **26%** |
+| Embedding | Titan | ~$0.18 | 9% |
+| **嗜好分類（追加）** | **Haiku** | **~$0.24** | **12%** |
+| **合計** | | **~$2.04** | |
 
-システム全体のコストに対して**約4%の増加**。Sonnet（Reflect）が支配的なため、Haiku の追加呼び出しの影響は軽微。
+システム全体のコストに対して**約12%の増加**。Haiku ベースのため全体コストは低い。
 
 ## 9. モジュール構成
 
 ```
 recommendation/src/recommendation/
   __init__.py              # 新規: パッケージ初期化
+  engine.py                # 新規: PreferenceEngine ファサード（extract/query/recommend/search の統合窓口）
   preference_extractor.py  # 新規: 嗜好分類 LLM + UPSERT ロジック
   preference_query.py      # 新規: get_user_profile 用クエリ
 
@@ -476,9 +492,10 @@ postgresql/init/
 
 | モジュール | 責務 |
 |-----------|------|
+| `engine.py` | PreferenceEngine: extract / query_profile / recommend / search のファサード。DB プール管理、セマフォ制御 |
 | `preference_extractor.py` | 会話テキスト → 嗜好分類 LLM → 構造化パース → item 名寄せ → UPSERT |
 | `preference_query.py` | bank_id + entity_id + category → preference_profiles 検索 → JSON 整形 |
-| `core.py` (既存) | `get_user_profile` ツール定義。`remember` 内で `asyncio.gather` により memory と recommendation を並列実行 |
+| `core.py` (既存) | ツール定義。`remember` 内で `asyncio.gather` により memory と recommendation を並列実行 |
 
 ## 10. 実装フェーズ
 

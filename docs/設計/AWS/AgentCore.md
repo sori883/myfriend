@@ -41,8 +41,24 @@ graph TB
 |---|---|
 | Runtime 名 | `myfriend_agent` |
 | アーティファクト | `agentcore/Dockerfile` からビルド |
-| ネットワーク | VPC モード（Isolated サブネット） |
-| 環境変数 | `AWS_REGION`, `DB_SECRET_ARN`, `DB_HOST`, `DB_NAME` |
+| ネットワーク | VPC モード（Private サブネット / PRIVATE_WITH_EGRESS、NAT Gateway 経由） |
+| 環境変数 | 下表参照 |
+
+### 環境変数
+
+| 変数名 | 用途 |
+|---|---|
+| `AWS_REGION` | AWS リージョン |
+| `DB_SECRET_ARN` | DB 認証情報の Secrets Manager ARN |
+| `DB_HOST` | Aurora エンドポイント |
+| `DB_NAME` | データベース名 |
+| `AGENT_MODEL_ID` | エージェント用モデル（Sonnet） |
+| `EXTRACTION_MODEL_ID` | Fact 抽出用モデル（Haiku） |
+| `EMBEDDING_MODEL_ID` | Embedding 用モデル（Titan Embed V2） |
+| `RERANK_MODEL_ID` | リランキング用モデル |
+| `REFLECT_MODEL_ID` | Reflect 用モデル（Haiku） |
+| `PREFERENCE_MODEL_ID` | 嗜好分類用モデル（Haiku） |
+| `TAVILY_API_KEY` | Web 検索 API キー |
 
 ### IAM 権限
 

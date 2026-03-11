@@ -84,7 +84,7 @@ graph TB
         W1["5W1H ファクト抽出"]
         W2["Embedding 生成"]
         W3["重複チェック<br/>(12h バケット + cosine ≥ 0.9)"]
-        W4["エンティティ解決<br/>(pg_trgm similarity ≥ 0.6)"]
+        W4["エンティティ解決<br/>(3要素スコアリング（閾値 0.6）)"]
         W5["DB INSERT"]
     end
 
