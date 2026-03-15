@@ -8,7 +8,7 @@ export type ParameterType = ReturnType<typeof parameter>;
 
 export const parameter = (envName: EnvNameType) => ({
   prefix: envName,
-  region: 'ap-northeast-1',
+  region: 'us-east-1',
   owner: 'sori883',
   project: 'myfriend',
   cost: `myfriend-${envName}`,
@@ -23,6 +23,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
+        agentCoreExcludeAzs: ['us-east-1b'],
         subnets: {
           Private1: {
             name: 'Private1',
@@ -58,6 +59,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
+        agentCoreExcludeAzs: ['us-east-1b'],
         subnets: {
           Private1: {
             name: 'Private1',
@@ -93,6 +95,7 @@ const envDiffParameter = (envName: EnvNameType) => {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
+        agentCoreExcludeAzs: ['us-east-1b'],
         subnets: {
           Private1: {
             name: 'Private1',

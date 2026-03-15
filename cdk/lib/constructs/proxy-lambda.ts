@@ -7,6 +7,7 @@ import { Construct } from 'constructs';
 import type { Runtime as AgentCoreRuntime } from '@aws-cdk/aws-bedrock-agentcore-alpha';
 
 interface Props {
+  readonly prefix: string;
   readonly agentCoreRuntime: AgentCoreRuntime;
 }
 
@@ -16,10 +17,10 @@ export class ProxyLambda extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const { agentCoreRuntime } = props;
+    const { prefix, agentCoreRuntime } = props;
 
     this.function = new nodejs.NodejsFunction(this, 'AgentCoreProxyFunction', {
-      functionName: 'myfriend-agentcore-proxy',
+      functionName: `${prefix}-myfriend-agentcore-proxy`,
       entry: path.join(__dirname, '../../resources/proxy-lambda/index.ts'),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_24_X,

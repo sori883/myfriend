@@ -11,6 +11,7 @@ import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface Props {
+  readonly prefix: string;
   readonly vpc: ec2.IVpc;
   readonly lambdaSecurityGroup: ec2.ISecurityGroup;
   readonly isolatedSubnets: ec2.ISubnet[];
@@ -23,6 +24,7 @@ export class Migration extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
     const {
+      prefix,
       vpc,
       lambdaSecurityGroup,
       isolatedSubnets,
@@ -36,7 +38,7 @@ export class Migration extends Construct {
       this,
       'MigrationFunction',
       {
-        functionName: 'myfriend-db-migration',
+        functionName: `${prefix}-myfriend-db-migration`,
         entry: path.join(
           __dirname,
           '../../resources/migration/index.ts'

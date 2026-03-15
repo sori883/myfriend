@@ -33,6 +33,7 @@ export class MainStack extends cdk.Stack {
 
     // 2. Database（Aurora Serverless v2 + Secrets Manager）
     const database = new Database(this, 'Database', {
+      prefix: parameter.prefix,
       vpc: network.vpc,
       isolatedSubnets: network.isolatedSubnets,
       auroraSecurityGroup: network.sgAurora,
@@ -45,6 +46,7 @@ export class MainStack extends cdk.Stack {
 
     // 3. Migration（Custom Resource → SQL 実行）
     new Migration(this, 'Migration', {
+      prefix: parameter.prefix,
       vpc: network.vpc,
       lambdaSecurityGroup: network.sgLambda,
       isolatedSubnets: network.isolatedSubnets,
@@ -55,6 +57,7 @@ export class MainStack extends cdk.Stack {
 
     // 4. Restore（S3 + Lambda → DB リストア）
     new Restore(this, 'Restore', {
+      prefix: parameter.prefix,
       vpc: network.vpc,
       lambdaSecurityGroup: network.sgLambda,
       isolatedSubnets: network.isolatedSubnets,
@@ -65,9 +68,16 @@ export class MainStack extends cdk.Stack {
     });
 
     // 5. AgentCore（Runtime + Bedrock 権限 + DB 権限 + VPC モード）
+    // AgentCore 非対応 AZ のサブネットを除外
+    const excludeAzs = parameter.diffEnv.vpc.agentCoreExcludeAzs;
+    const agentCoreSubnets = excludeAzs
+      ? network.privateSubnets.filter(s => !excludeAzs.includes(s.availabilityZone))
+      : network.privateSubnets;
+
     const agentCore = new AgentCore(this, 'AgentCore', {
+      prefix: parameter.prefix,
       vpc: network.vpc,
-      privateSubnets: network.privateSubnets,
+      privateSubnets: agentCoreSubnets,
       auroraSecurityGroup: network.sgAurora,
       dbSecret: database.secret,
       dbHost: database.clusterEndpoint,
@@ -85,11 +95,13 @@ export class MainStack extends cdk.Stack {
 
     // 6. ProxyLambda（AgentCore ARN 参照）
     const proxyLambda = new ProxyLambda(this, 'ProxyLambda', {
+      prefix: parameter.prefix,
       agentCoreRuntime: agentCore.agentCoreRuntime,
     });
 
     // 7. ApiGateway（ProxyLambda 参照 + API Key 認証）
     const apiGateway = new ApiGateway(this, 'APIGateway', {
+      prefix: parameter.prefix,
       lambdaFunction: proxyLambda.function,
       dailyQuota: parameter.diffEnv.api.dailyQuota,
     });
@@ -101,6 +113,7 @@ export class MainStack extends cdk.Stack {
 
     // 8. Batch（Lambda + EventBridge）
     new Batch(this, 'Batch', {
+      prefix: parameter.prefix,
       vpc: network.vpc,
       lambdaSecurityGroup: network.sgLambda,
       isolatedSubnets: network.isolatedSubnets,

@@ -5,6 +5,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface Props {
+  readonly prefix: string;
   readonly vpc: ec2.IVpc;
   readonly isolatedSubnets: ec2.ISubnet[];
   readonly auroraSecurityGroup: ec2.ISecurityGroup;
@@ -24,6 +25,7 @@ export class Database extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
     const {
+      prefix,
       vpc,
       isolatedSubnets,
       auroraSecurityGroup,
@@ -38,7 +40,7 @@ export class Database extends Construct {
 
     // Secrets Manager でDB認証情報を管理
     this.secret = new secretsmanager.Secret(this, 'DatabaseSecret', {
-      secretName: 'myfriend/aurora/credentials',
+      secretName: `${prefix}-myfriend/aurora/credentials`,
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'myfriend_admin' }),
         generateStringKey: 'password',

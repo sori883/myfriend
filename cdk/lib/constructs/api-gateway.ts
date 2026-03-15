@@ -4,6 +4,7 @@ import type * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 
 interface Props {
+  readonly prefix: string;
   readonly lambdaFunction: lambda.IFunction;
   readonly dailyQuota: number;
 }
@@ -15,12 +16,12 @@ export class ApiGateway extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const { lambdaFunction, dailyQuota } = props;
+    const { prefix, lambdaFunction, dailyQuota } = props;
 
     // LambdaRestApi作成（ストリーミング対応 + API Key 必須）
     const restApi = new apigateway.LambdaRestApi(this, 'RestApi', {
       handler: lambdaFunction,
-      restApiName: 'MyfriendApi',
+      restApiName: `${prefix}-myfriend-api`,
       description: 'REST API for Myfriend agent with response streaming',
       endpointTypes: [apigateway.EndpointType.REGIONAL],
       deployOptions: {
@@ -40,12 +41,12 @@ export class ApiGateway extends Construct {
 
     // API Key
     this.apiKey = restApi.addApiKey('ApiKey', {
-      apiKeyName: 'myfriend-api-key',
+      apiKeyName: `${prefix}-myfriend-api-key`,
     });
 
     // Usage Plan（スロットリング + 日次クォータ）
     const usagePlan = restApi.addUsagePlan('UsagePlan', {
-      name: 'myfriend-usage-plan',
+      name: `${prefix}-myfriend-usage-plan`,
       apiStages: [
         { api: restApi, stage: restApi.deploymentStage },
       ],

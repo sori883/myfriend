@@ -11,6 +11,7 @@ import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface Props {
+  readonly prefix: string;
   readonly vpc: ec2.IVpc;
   readonly lambdaSecurityGroup: ec2.ISecurityGroup;
   readonly isolatedSubnets: ec2.ISubnet[];
@@ -27,6 +28,7 @@ export class Restore extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
     const {
+      prefix,
       vpc,
       lambdaSecurityGroup,
       isolatedSubnets,
@@ -38,7 +40,7 @@ export class Restore extends Construct {
 
     // リストア用 S3 バケット
     this.bucket = new s3.Bucket(this, 'RestoreBucket', {
-      bucketName: `myfriend-db-restore-${cdk.Stack.of(this).account}`,
+      bucketName: `${prefix}-myfriend-db-restore-${cdk.Stack.of(this).account}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -56,7 +58,7 @@ export class Restore extends Construct {
       this,
       'RestoreFunction',
       {
-        functionName: 'myfriend-db-restore',
+        functionName: `${prefix}-myfriend-db-restore`,
         entry: path.join(
           __dirname,
           '../../resources/restore/index.ts'

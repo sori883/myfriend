@@ -15,7 +15,7 @@ cdk.Tags.of(app).add('Cost', parameter.cost);
 cdk.Tags.of(app).add('Owner', parameter.owner);
 
 new MainStack(app, 'Main', {
-  stackName: `${parameter.prefix}-Main2`,
+  stackName: `${parameter.prefix}-Main3`,
   env: { account: parameter.dotEnv.ACCOUNT_ID, region: parameter.region },
   parameter,
 });

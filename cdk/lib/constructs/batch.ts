@@ -11,6 +11,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 
 interface Props {
+  readonly prefix: string;
   readonly vpc: ec2.IVpc;
   readonly lambdaSecurityGroup: ec2.ISecurityGroup;
   readonly isolatedSubnets: ec2.ISubnet[];
@@ -29,6 +30,7 @@ export class Batch extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
     const {
+      prefix,
       vpc,
       lambdaSecurityGroup,
       isolatedSubnets,
@@ -43,13 +45,13 @@ export class Batch extends Construct {
 
     // DLQ
     const dlq = new sqs.Queue(this, 'BatchDLQ', {
-      queueName: 'myfriend-batch-dlq',
+      queueName: `${prefix}-myfriend-batch-dlq`,
       retentionPeriod: cdk.Duration.days(14),
     });
 
     // Batch Lambda（Docker Image）
     this.function = new lambda.DockerImageFunction(this, 'BatchFunction', {
-      functionName: 'myfriend-batch',
+      functionName: `${prefix}-myfriend-batch`,
       code: lambda.DockerImageCode.fromImageAsset(
         path.join(__dirname, '../../..'),
         {
@@ -98,7 +100,7 @@ export class Batch extends Construct {
     // EventBridge スケジュール
     if (enabled) {
       const rule = new events.Rule(this, 'BatchScheduleRule', {
-        ruleName: 'myfriend-batch-schedule',
+        ruleName: `${prefix}-myfriend-batch-schedule`,
         schedule: events.Schedule.rate(
           cdk.Duration.minutes(scheduleMinutes)
         ),

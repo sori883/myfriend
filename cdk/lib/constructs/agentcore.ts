@@ -7,6 +7,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as agentcore from '@aws-cdk/aws-bedrock-agentcore-alpha';
 
 interface Props {
+  readonly prefix: string;
   readonly vpc: ec2.IVpc;
   readonly privateSubnets: ec2.ISubnet[];
   readonly auroraSecurityGroup: ec2.ISecurityGroup;
@@ -21,7 +22,7 @@ export class AgentCore extends Construct {
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
-    const { vpc, privateSubnets, auroraSecurityGroup, dbSecret, dbHost, databaseName, runtimeEnv } = props;
+    const { prefix, vpc, privateSubnets, auroraSecurityGroup, dbSecret, dbHost, databaseName, runtimeEnv } = props;
 
     // AgentCore Runtime Artifact（ビルドコンテキスト: リポジトリルート）
     const artifact = agentcore.AgentRuntimeArtifact.fromAsset(
@@ -46,7 +47,8 @@ export class AgentCore extends Construct {
 
     // AgentCore Runtime（VPC モード: Aurora アクセス用）
     this.agentCoreRuntime = new agentcore.Runtime(this, 'Agent', {
-      runtimeName: 'myfriend_agent',
+      // AgentCore runtime名はハイフン非対応のためスネークケースを使用
+      runtimeName: `${prefix}_myfriend_agent`,
       agentRuntimeArtifact: artifact,
       description: 'Myfriend AI agent with memory system',
       networkConfiguration: agentcore.RuntimeNetworkConfiguration.usingVpc(this, {
