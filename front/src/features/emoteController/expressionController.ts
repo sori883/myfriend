@@ -8,22 +8,6 @@ import { AutoLookAt } from './autoLookAt'
 import { AutoBlink } from './autoBlink'
 
 /**
- * 感情ごとの追加ブレンドシェイプ
- * メインの感情プリセットに加えて同時に適用する
- * vrm.update() の後に強制適用するため、overrideMouth 等の影響を受けない
- */
-const EMOTION_EXTRA_EXPRESSIONS: Partial<
-  Record<
-    VRMExpressionPresetName,
-    ReadonlyArray<{ preset: VRMExpressionPresetName; value: number }>
-  >
-> = {
-  surprised: [
-    { preset: 'aa', value: 0.3 },
-  ],
-}
-
-/**
  * Expressionを管理するクラス
  *
  * 主に前の表情を保持しておいて次の表情を適用する際に0に戻す作業や、
@@ -34,10 +18,7 @@ export class ExpressionController {
   private _autoBlink?: AutoBlink
   private _expressionManager?: VRMExpressionManager
   private _currentEmotion: VRMExpressionPresetName
-  private _currentExtraExpressions: ReadonlyArray<{
-    preset: VRMExpressionPresetName
-    value: number
-  }>
+  private _currentMixKeys: string[]
   private _currentLipSync: {
     preset: VRMExpressionPresetName
     value: number
@@ -45,7 +26,7 @@ export class ExpressionController {
   constructor(vrm: VRM, camera: THREE.Object3D) {
     this._autoLookAt = new AutoLookAt(vrm, camera)
     this._currentEmotion = 'neutral'
-    this._currentExtraExpressions = []
+    this._currentMixKeys = []
     this._currentLipSync = null
     if (vrm.expressionManager) {
       this._expressionManager = vrm.expressionManager
@@ -53,23 +34,57 @@ export class ExpressionController {
     }
   }
 
-  public playEmotion(preset: VRMExpressionPresetName) {
-    if (this._currentEmotion != 'neutral') {
+  private clearCurrentExpression() {
+    if (this._currentEmotion !== 'neutral') {
       this._expressionManager?.setValue(this._currentEmotion, 0)
     }
+    for (const key of this._currentMixKeys) {
+      this._expressionManager?.setValue(key, 0)
+    }
+    this._currentMixKeys = []
+  }
+
+  public playEmotion(preset: VRMExpressionPresetName) {
+    this.clearCurrentExpression()
 
     if (preset == 'neutral') {
       this._autoBlink?.setEnable(true)
       this._currentEmotion = preset
-      this._currentExtraExpressions = []
       return
     }
 
     const t = this._autoBlink?.setEnable(false) || 0
     this._currentEmotion = preset
-    this._currentExtraExpressions = EMOTION_EXTRA_EXPRESSIONS[preset] ?? []
     setTimeout(() => {
       this._expressionManager?.setValue(preset, 1)
+    }, t * 1000)
+  }
+
+  /**
+   * 複数の表情BlendShapeを重みつきで合成して適用する
+   * @param mix 表情名 -> 重み(0.0-1.0)のマップ
+   */
+  public playEmotionMix(mix: Record<string, number>) {
+    this.clearCurrentExpression()
+
+    const keys = Object.keys(mix).filter((k) => mix[k] > 0)
+    if (keys.length === 0) {
+      this._autoBlink?.setEnable(true)
+      this._currentEmotion = 'neutral'
+      return
+    }
+
+    const controlsBlink = keys.some(
+      (k) => k === 'blink' || k === 'blinkLeft' || k === 'blinkRight'
+    )
+    const t = controlsBlink ? this._autoBlink?.setEnable(false) || 0 : 0
+
+    this._currentEmotion = 'neutral'
+    this._currentMixKeys = keys
+    setTimeout(() => {
+      for (const key of keys) {
+        this._expressionManager?.setValue(key, mix[key])
+      }
     }, t * 1000)
   }
 
@@ -97,20 +112,7 @@ export class ExpressionController {
     }
   }
 
-  /**
-   * vrm.update() の後に呼び出し、追加ブレンドシェイプを強制適用する
-   * VRM の override 処理（overrideMouth 等）を回避するため、
-   * expression.applyWeight() で直接モーフターゲットを上書きする
-   */
-  public applyExtraExpressions(): void {
-    if (this._currentExtraExpressions.length === 0) return
-    if (!this._expressionManager) return
-
-    for (const extra of this._currentExtraExpressions) {
-      const expression = this._expressionManager.getExpression(extra.preset)
-      if (!expression) continue
-      expression.weight = extra.value
-      expression.applyWeight()
-    }
+  public getCurrentEmotion(): VRMExpressionPresetName {
+    return this._currentEmotion
   }
 }

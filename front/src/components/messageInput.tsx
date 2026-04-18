@@ -63,11 +63,20 @@ export const MessageInput = ({
   const [fileError, setFileError] = useState<string>('')
   const [showImageActions, setShowImageActions] = useState(false)
   const [inputValidationError, setInputValidationError] = useState<string>('')
+  const [isSmallScreen, setIsSmallScreen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const realtimeAPIMode = settingsStore((s) => s.realtimeAPIMode)
   const showSilenceProgressBar = settingsStore((s) => s.showSilenceProgressBar)
 
   const { t } = useTranslation()
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 640px)')
+    setIsSmallScreen(!mql.matches)
+    const handler = (e: MediaQueryListEvent) => setIsSmallScreen(!e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   // Kiosk mode input validation
   const { isKioskMode, validateInput, maxInputLength } = useKioskMode()
@@ -391,8 +400,8 @@ export const MessageInput = ({
     <div className="absolute bottom-0 z-20 w-screen">
       {showPermissionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-2xl max-w-md">
-            <h3 className="text-xl font-bold mb-4">
+          <div className="bg-white p-4 sm:p-6 rounded-2xl max-w-[calc(100vw-2rem)] sm:max-w-md">
+            <h3 className="text-lg sm:text-xl font-bold mb-4">
               {t('MicrophonePermission')}
             </h3>
             <p className="mb-4">{t('MicrophonePermissionMessage')}</p>
@@ -405,8 +414,8 @@ export const MessageInput = ({
           </div>
         </div>
       )}
-      <div className="bg-base-light text-black">
-        <div className="mx-auto max-w-4xl p-4 pb-3">
+      <div className="bg-transparent text-black">
+        <div className="mx-auto max-w-4xl p-2 sm:p-4 pb-3">
           {/* プログレスバー - 設定に基づいて表示/非表示 */}
           {isMicRecording && showSilenceProgressBar && (
             <div className="w-full h-2 bg-gray-200 rounded-full mb-2 overflow-hidden">
@@ -470,28 +479,6 @@ export const MessageInput = ({
           )}
 
           <div className="flex gap-2 items-end">
-            <div className="flex-shrink-0 pb-[0.3rem]">
-              <IconButton
-                iconName={
-                  continuousMicListeningMode ? '24/Close' : '24/Microphone'
-                }
-                backgroundColor={
-                  continuousMicListeningMode
-                    ? isMicRecording
-                      ? 'bg-green-500 text-theme'
-                      : 'bg-green-600 text-theme'
-                    : undefined
-                }
-                isProcessing={isMicRecording}
-                isProcessingIcon={
-                  continuousMicListeningMode ? '24/Microphone' : '24/PauseAlt'
-                }
-                disabled={
-                  continuousMicListeningMode || chatProcessing || isSpeaking
-                }
-                onClick={handleMicClick}
-              />
-            </div>
             <div className="flex-1 relative">
               {/* 画像添付インジケーター - アイコンのみ表示設定の場合 */}
               {showIconDisplay && (
@@ -542,7 +529,7 @@ export const MessageInput = ({
                     ? `${t('AnswerGenerating')}${loadingDots}`
                     : continuousMicListeningMode && isMicRecording
                       ? t('ListeningContinuously')
-                      : isMultiModalSupported
+                      : isMultiModalSupported && !isSmallScreen
                         ? `${t('EnterYourQuestion')} (${t('PasteImageSupported') || 'Paste image supported'})`
                         : t('EnterYourQuestion')
                 }
@@ -552,7 +539,7 @@ export const MessageInput = ({
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 disabled={chatProcessing || slidePlaying || realtimeAPIMode}
-                className="bg-white hover:bg-white-hover focus:bg-white disabled:bg-gray-100 disabled:text-primary-disabled rounded-2xl w-full px-4 text-theme-default font-bold disabled"
+                className="bg-white/95 hover:bg-white focus:bg-white disabled:bg-gray-100 disabled:text-primary-disabled rounded-[28px] w-full px-5 text-sm sm:text-base text-gray-900 font-medium backdrop-blur-md focus:outline-none shadow-[0_10px_32px_-12px_rgba(17,24,39,0.2)] focus:shadow-[0_14px_40px_-12px_rgba(17,24,39,0.28)] transition-shadow placeholder:text-gray-400"
                 value={userMessage}
                 rows={rows}
                 maxLength={maxInputLength}
@@ -571,13 +558,6 @@ export const MessageInput = ({
                 isProcessing={chatProcessing}
                 disabled={chatProcessing || !userMessage || realtimeAPIMode}
                 onClick={handleSendClick}
-              />
-
-              <IconButton
-                iconName="stop"
-                className="bg-secondary hover:bg-secondary-hover active:bg-secondary-press disabled:bg-secondary-disabled"
-                onClick={onClickStopButton}
-                isProcessing={false}
               />
             </div>
           </div>

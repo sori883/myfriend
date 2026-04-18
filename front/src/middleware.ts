@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server'
 
 const COOKIE_NAME = 'site_auth'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30日
+const SESSION_CONTEXT = 'site_auth_session_v1'
+const TOKEN_QUERY_KEY = 'token'
 
 /** タイミング攻撃を防ぐ定時間比較 */
 function constantTimeEquals(a: string, b: string): boolean {
@@ -14,30 +16,39 @@ function constantTimeEquals(a: string, b: string): boolean {
   return result === 0
 }
 
-/** パスワードハッシュから HMAC ベースのセッショントークンを生成 */
-function deriveSessionToken(passwordHash: string): string {
-  // Edge Runtime では crypto.createHmac が使えないため、
-  // パスワードハッシュ + 固定ソルトの簡易派生トークンを使用
-  const salt = 'site_auth_session_v1'
-  let hash = 0
-  const combined = salt + passwordHash
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i)
-    hash = ((hash << 5) - hash + char) | 0
+/** Web Crypto API (Edge Runtime 対応) で HMAC-SHA256 を計算して hex で返す */
+async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(message)
+  )
+  const bytes = new Uint8Array(signature)
+  let hex = ''
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0')
   }
-  return `s_${Math.abs(hash).toString(36)}_${passwordHash.slice(0, 8)}`
+  return hex
 }
 
-export function middleware(request: NextRequest) {
-  const passwordHash = process.env.SITE_PASSWORD_HASH
-  const isVercel = process.env.VERCEL
+export async function middleware(request: NextRequest) {
+  const secret = process.env.SITE_ACCESS_SECRET
+  const isVercel = process.env.VERCEL === '1'
 
-  // Vercel以外 or パスワード未設定 → スキップ
-  if (!isVercel || !passwordHash) {
+  // Vercel 以外 or シークレット未設定 → 認証スキップ
+  if (!isVercel || !secret) {
     return NextResponse.next()
   }
 
-  const sessionToken = deriveSessionToken(passwordHash)
+  const sessionToken = await hmacSha256Hex(secret, SESSION_CONTEXT)
 
   // cookie 認証済み → スキップ
   const cookieValue = request.cookies.get(COOKIE_NAME)?.value ?? ''
@@ -46,11 +57,11 @@ export function middleware(request: NextRequest) {
   }
 
   // URLパラメータのトークンを検証
-  const token = request.nextUrl.searchParams.get('token') ?? ''
-  if (token.length > 0 && constantTimeEquals(token, passwordHash)) {
+  const token = request.nextUrl.searchParams.get(TOKEN_QUERY_KEY) ?? ''
+  if (token.length > 0 && constantTimeEquals(token, secret)) {
     // クリーンURLにリダイレクト + cookie セット
     const url = request.nextUrl.clone()
-    url.searchParams.delete('token')
+    url.searchParams.delete(TOKEN_QUERY_KEY)
     const response = NextResponse.redirect(url)
     response.cookies.set(COOKIE_NAME, sessionToken, {
       httpOnly: true,

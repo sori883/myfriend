@@ -13,7 +13,6 @@ export interface AIServiceConfig {
 }
 
 export const aiServiceOptions: AIServiceConfig[] = [
-  { value: 'agentcore', label: 'AgentCore' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'google', label: 'Google Gemini' },
@@ -158,10 +157,5 @@ export const getServiceConfigByKey = (
     value: 'custom-api',
     label: 'Custom API',
     showMultiModalToggle: true,
-  },
-  agentcore: {
-    value: 'agentcore',
-    label: 'AgentCore',
-    description: 'Bedrock AgentCore backend with memory system',
   },
 })

@@ -51,21 +51,21 @@ div {
   color: inherit;
 }
 
-/* Default テーマ（デフォルト） */
+/* Default テーマ（モノクロ：黒と白基調） */
 :root {
-  --color-primary: #856292;
-  --color-primary-hover: #8e76a1;
-  --color-primary-press: #988bb0;
-  --color-primary-disabled: #6f48694d;
-  --color-secondary: #ff617f;
-  --color-secondary-hover: #ff849b;
-  --color-secondary-press: #ff9eb1;
-  --color-secondary-disabled: #ff617f4d;
-  --color-text-primary: #514062;
+  --color-primary: #111827;
+  --color-primary-hover: #1f2937;
+  --color-primary-press: #374151;
+  --color-primary-disabled: #1118274d;
+  --color-secondary: #111827;
+  --color-secondary-hover: #1f2937;
+  --color-secondary-press: #374151;
+  --color-secondary-disabled: #1118274d;
+  --color-text-primary: #111827;
   --color-text-base: #ffffff;
-  --color-text-default: #2d3748;
-  --color-base-light: #fbe2ca;
-  --color-base-dark: #332d2d;
+  --color-text-default: #111827;
+  --color-base-light: #ffffff;
+  --color-base-dark: #111827;
 }
 
 /* Cool テーマ（寒色） */

@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware'
 import { exclusivityMiddleware } from './exclusionMiddleware'
 
 import { KoeiroParam, DEFAULT_PARAM } from '@/features/constants/koeiroParam'
-import { isLive2DEnabled } from '@/utils/live2dRestriction'
 import {
   MemoryConfig,
   DEFAULT_MEMORY_CONFIG,
@@ -70,7 +69,6 @@ interface APIKeys {
   customApiStream: boolean
   includeSystemMessagesInCustomApi: boolean
   customApiIncludeMimeType: boolean
-  agentcoreBankId: string
 }
 
 interface Live2DSettings {
@@ -135,11 +133,6 @@ interface ModelProvider extends Live2DSettings {
   openaiTTSVoice: OpenAITTSVoice
   openaiTTSModel: OpenAITTSModel
   openaiTTSSpeed: number
-  nijivoiceApiKey: string
-  nijivoiceActorId: string
-  nijivoiceSpeed: number
-  nijivoiceEmotionalLevel: number
-  nijivoiceSoundDuration: number
 }
 
 interface Integrations {
@@ -197,6 +190,7 @@ interface Character {
     z: number
   }
   lightingIntensity: number
+  poseAdjustMode: boolean
   selectedPNGTuberPath: string
   pngTuberSensitivity: number
   pngTuberChromaKeyEnabled: boolean
@@ -205,6 +199,56 @@ interface Character {
   pngTuberScale: number
   pngTuberOffsetX: number
   pngTuberOffsetY: number
+  poseConfigs: PoseConfigItem[]
+  expressionConfigs: ExpressionConfigItem[]
+  thinkingPoseEnabled: boolean
+  thinkingPoseId: string
+}
+
+// Pose config item type
+export type PoseExpression =
+  | 'neutral'
+  | 'happy'
+  | 'angry'
+  | 'sad'
+  | 'relaxed'
+  | 'surprised'
+// 複数のBlendShapeを合成する表情ミックス（キーは任意のVRM表情名、値は0.0-1.0）
+export type PoseExpressionMix = Partial<
+  Record<
+    | 'neutral'
+    | 'happy'
+    | 'angry'
+    | 'sad'
+    | 'relaxed'
+    | 'surprised'
+    | 'lookUp'
+    | 'lookDown'
+    | 'lookLeft'
+    | 'lookRight'
+    | 'blink'
+    | 'blinkLeft'
+    | 'blinkRight',
+    number
+  >
+>
+export type PoseConfigItem =
+  | {
+      id: string
+      json: string
+      expression?: PoseExpression | PoseExpressionMix
+    }
+  | {
+      id: string
+      sequence: string[]
+      switchDuration: number
+      expression?: PoseExpression | PoseExpressionMix
+    }
+
+// Expression-only config item type (表情ボタン用、ポーズは変えない)
+export type ExpressionConfigItem = {
+  id: string
+  expression: PoseExpression | PoseExpressionMix
 }
 
 // Preset question type
@@ -320,7 +364,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
 
   // Model Provider
   selectAIService:
-    (process.env.NEXT_PUBLIC_SELECT_AI_SERVICE as AIService) || 'agentcore',
+    (process.env.NEXT_PUBLIC_SELECT_AI_SERVICE as AIService) || 'openai',
   selectAIModel: migrateOpenAIModelName(
     process.env.NEXT_PUBLIC_SELECT_AI_MODEL ||
       defaultModels[
@@ -328,7 +372,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
       ]
   ),
   localLlmUrl: process.env.NEXT_PUBLIC_LOCAL_LLM_URL || '',
-  selectVoice: (process.env.NEXT_PUBLIC_SELECT_VOICE as AIVoice) || 'none',
+  selectVoice: (process.env.NEXT_PUBLIC_SELECT_VOICE as AIVoice) || 'voicevox',
   koeiroParam: DEFAULT_PARAM,
   googleTtsType: process.env.NEXT_PUBLIC_GOOGLE_TTS_TYPE || '',
   voicevoxSpeaker: process.env.NEXT_PUBLIC_VOICEVOX_SPEAKER || '46',
@@ -421,7 +465,6 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_INCLUDE_SYSTEM_MESSAGES_IN_CUSTOM_API !== 'false',
   customApiIncludeMimeType:
     process.env.NEXT_PUBLIC_CUSTOM_API_INCLUDE_MIME_TYPE !== 'false',
-  agentcoreBankId: '00000000-0000-4000-8000-000000000001',
 
   // Integrations
   difyUrl: '',
@@ -484,24 +527,40 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_CHARACTER_PRESET1 ||
     '',
   selectedVrmPath:
-    '/vrm/nikechan_v1.vrm',
+    process.env.NEXT_PUBLIC_SELECTED_VRM_PATH || '/vrm/nikechan_v1.vrm',
   selectedLive2DPath:
     process.env.NEXT_PUBLIC_SELECTED_LIVE2D_PATH ||
     '/live2d/nike01/nike01.model3.json',
-  fixedCharacterPosition: false,
-  characterPosition: {
-    x: 0,
-    y: 0,
-    z: 0,
-    scale: 1,
-  },
-  characterRotation: {
-    x: 0,
-    y: 0,
-    z: 0,
-  },
+  fixedCharacterPosition:
+    process.env.NEXT_PUBLIC_FIXED_CHARACTER_POSITION === 'true',
+  characterPosition: (() => {
+    const val = process.env.NEXT_PUBLIC_CHARACTER_POSITION || ''
+    const parts = val.split(',')
+    return parts.length >= 4
+      ? {
+          x: parseFloat(parts[0]) || 0,
+          y: parseFloat(parts[1]) || 0,
+          z: parseFloat(parts[2]) || 0,
+          scale: Number.isFinite(parseFloat(parts[3]))
+            ? parseFloat(parts[3])
+            : 1,
+        }
+      : { x: 0, y: 0, z: 0, scale: 1 }
+  })(),
+  characterRotation: (() => {
+    const val = process.env.NEXT_PUBLIC_CHARACTER_ROTATION || ''
+    const parts = val.split(',')
+    return parts.length >= 3
+      ? {
+          x: parseFloat(parts[0]) || 0,
+          y: parseFloat(parts[1]) || 0,
+          z: parseFloat(parts[2]) || 0,
+        }
+      : { x: 0, y: 0, z: 0 }
+  })(),
   lightingIntensity:
     parseFloat(process.env.NEXT_PUBLIC_LIGHTING_INTENSITY || '1.0') || 1.0,
+  poseAdjustMode: process.env.NEXT_PUBLIC_POSE_ADJUST_MODE === 'true',
 
   // General
   selectLanguage: (process.env.NEXT_PUBLIC_SELECT_LANGUAGE as Language) || 'ja',
@@ -606,30 +665,13 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   // Custom model toggle
   customModel: process.env.NEXT_PUBLIC_CUSTOM_MODEL === 'true',
 
-  // NijiVoice settings
-  nijivoiceApiKey: '',
-  nijivoiceActorId: process.env.NEXT_PUBLIC_NIJIVOICE_ACTOR_ID || '',
-  nijivoiceSpeed:
-    parseFloat(process.env.NEXT_PUBLIC_NIJIVOICE_SPEED || '1.0') || 1.0,
-  nijivoiceEmotionalLevel:
-    parseFloat(process.env.NEXT_PUBLIC_NIJIVOICE_EMOTIONAL_LEVEL || '0.1') ||
-    0.1,
-  nijivoiceSoundDuration:
-    parseFloat(process.env.NEXT_PUBLIC_NIJIVOICE_SOUND_DURATION || '0.1') ||
-    0.1,
-
   // Settings
-  modelType: (() => {
-    const envType = process.env.NEXT_PUBLIC_MODEL_TYPE as
+  modelType:
+    (process.env.NEXT_PUBLIC_MODEL_TYPE as
       | 'vrm'
       | 'live2d'
       | 'pngtuber'
-      | undefined
-    if (envType === 'live2d' && !isLive2DEnabled()) {
-      return 'vrm'
-    }
-    return envType || 'vrm'
-  })(),
+      | undefined) || 'vrm',
   selectedPNGTuberPath:
     process.env.NEXT_PUBLIC_SELECTED_PNGTUBER_PATH || '/pngtuber/nike01',
   pngTuberSensitivity:
@@ -649,6 +691,105 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     parseFloat(process.env.NEXT_PUBLIC_PNGTUBER_OFFSET_X || '0') || 0,
   pngTuberOffsetY:
     parseFloat(process.env.NEXT_PUBLIC_PNGTUBER_OFFSET_Y || '0') || 0,
+  poseConfigs: [
+    {
+      id: 'think',
+      json: '/poses/think.json',
+      expression: { relaxed: 0.5, lookUp: 0.3, lookLeft: 0.2 },
+    },
+    {
+      id: 'cheer',
+      json: '/poses/cheer.json',
+      expression: { happy: 1.0, lookUp: 0.3 },
+    },
+    {
+      id: 'cross',
+      json: '/poses/cross.json',
+      expression: { angry: 0.9 },
+    },
+    {
+      id: 'mouth_cover',
+      json: '/poses/mouth_cover.json',
+      expression: { happy: 0.35, blinkLeft: 0.3, blinkRight: 0.3 },
+    },
+    {
+      id: 'crossed_arms',
+      json: '/poses/crossed_arms.json',
+      expression: { angry: 0.2, lookDown: 0.15 },
+    },
+    {
+      id: 'bow',
+      json: '/poses/bow.json',
+      expression: { happy: 0.25, blinkLeft: 0.4, blinkRight: 0.4 },
+    },
+    {
+      id: 'shrug',
+      json: '/poses/shrug.json',
+      expression: { sad: 0.4, relaxed: 0.3, lookDown: 0.2 },
+    },
+    {
+      id: 'shy',
+      json: '/poses/shy.json',
+      expression: {
+        happy: 0.7,
+        blinkLeft: 0.4,
+        blinkRight: 0.4,
+        lookDown: 0.2,
+      },
+    },
+    {
+      id: 'wave',
+      sequence: ['/poses/wave1.json', '/poses/wave2.json'],
+      switchDuration: 0.5,
+      expression: { happy: 0.9, lookUp: 0.2 },
+    },
+    {
+      id: 'clap',
+      sequence: ['/poses/clap1.json', '/poses/clap2.json'],
+      switchDuration: 0.2,
+      expression: { happy: 1.0, lookUp: 0.3 },
+    },
+  ],
+  expressionConfigs: [
+    { id: 'smile', expression: { happy: 1.0 } },
+    { id: 'wry', expression: { happy: 0.4 } },
+    { id: 'angry', expression: { angry: 1.0 } },
+    { id: 'pout', expression: { angry: 0.4, lookDown: 0.2 } },
+    { id: 'sad', expression: { sad: 1.0 } },
+    {
+      id: 'cry',
+      expression: { sad: 0.7, blinkLeft: 0.5, blinkRight: 0.5 },
+    },
+    { id: 'relaxed', expression: { relaxed: 0.9 } },
+    {
+      id: 'sleepy',
+      expression: { relaxed: 0.5, blinkLeft: 0.8, blinkRight: 0.8 },
+    },
+    {
+      id: 'blush',
+      expression: {
+        happy: 0.6,
+        blinkLeft: 0.4,
+        blinkRight: 0.4,
+        lookDown: 0.3,
+      },
+    },
+    {
+      id: 'wink_L',
+      expression: { blinkLeft: 0.9 },
+    },
+    {
+      id: 'wink_R',
+      expression: { blinkRight: 0.9 },
+    },
+    {
+      id: 'wonder',
+      expression: { happy: 0.2, lookUp: 0.5 },
+    },
+  ],
+  thinkingPoseEnabled:
+    process.env.NEXT_PUBLIC_THINKING_POSE_ENABLED === 'true' || false,
+  thinkingPoseId: process.env.NEXT_PUBLIC_THINKING_POSE_ID || 'think',
 
   // Memory settings
   memoryEnabled:
@@ -776,86 +917,81 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   surprisedMotionGroup: process.env.NEXT_PUBLIC_SURPRISED_MOTION_GROUP || '',
 })
 
+type PersistedSettingsState = Partial<SettingsState> & {
+  presenceGreetingMessage?: string
+  presenceDepartureMessage?: string
+}
+
+const migratePersistedSettings = (
+  state?: PersistedSettingsState
+): PersistedSettingsState | undefined => {
+  if (!state) return state
+
+  const migrated = { ...state }
+
+  // poseConfigs / expressionConfigs は開発者固定構成のため、旧永続化データは破棄
+  if ('poseConfigs' in migrated) {
+    delete migrated.poseConfigs
+  }
+  if ('expressionConfigs' in migrated) {
+    delete (migrated as Record<string, unknown>).expressionConfigs
+  }
+
+  if (
+    migrated.selectAIService === 'openai' &&
+    typeof migrated.selectAIModel === 'string'
+  ) {
+    migrated.selectAIModel = migrateOpenAIModelName(migrated.selectAIModel)
+  }
+
+  if (typeof migrated.presenceGreetingMessage === 'string') {
+    if (!migrated.presenceGreetingPhrases?.length) {
+      migrated.presenceGreetingPhrases = migrated.presenceGreetingMessage
+        ? [createIdlePhrase(migrated.presenceGreetingMessage, 'happy', 0)]
+        : []
+    }
+    delete migrated.presenceGreetingMessage
+  }
+
+  if (typeof migrated.presenceDepartureMessage === 'string') {
+    if (!migrated.presenceDeparturePhrases?.length) {
+      migrated.presenceDeparturePhrases = migrated.presenceDepartureMessage
+        ? [createIdlePhrase(migrated.presenceDepartureMessage, 'neutral', 0)]
+        : []
+    }
+    delete migrated.presenceDepartureMessage
+  }
+
+  return migrated
+}
+
+const mergePersistedSettings = (
+  persistedState: unknown,
+  currentState: SettingsState
+): SettingsState => {
+  const migratedState = migratePersistedSettings(
+    persistedState as PersistedSettingsState | undefined
+  )
+  const mergedState = {
+    ...currentState,
+    ...migratedState,
+  }
+
+  if (process.env.NEXT_PUBLIC_ALWAYS_OVERRIDE_WITH_ENV_VARIABLES === 'true') {
+    return {
+      ...mergedState,
+      ...getInitialValuesFromEnv(),
+    }
+  }
+
+  return mergedState
+}
+
 const settingsStore = create<SettingsState>()(
   exclusivityMiddleware(
-    persist((set, get) => getInitialValuesFromEnv(), {
+    persist(() => getInitialValuesFromEnv(), {
       name: 'aitube-kit-settings',
-      onRehydrateStorage: () => (state) => {
-        // Migrate OpenAI model names when loading from storage
-        if (
-          state &&
-          state.selectAIService === 'openai' &&
-          state.selectAIModel
-        ) {
-          const migratedModel = migrateOpenAIModelName(state.selectAIModel)
-          if (migratedModel !== state.selectAIModel) {
-            state.selectAIModel = migratedModel
-          }
-        }
-
-        // Force modelType away from live2d when Live2D is not enabled
-        if (state && !isLive2DEnabled() && state.modelType === 'live2d') {
-          state.modelType = 'vrm'
-        }
-
-        // Override with environment variables if the option is enabled
-        if (
-          state &&
-          process.env.NEXT_PUBLIC_ALWAYS_OVERRIDE_WITH_ENV_VARIABLES === 'true'
-        ) {
-          const envValues = getInitialValuesFromEnv()
-          Object.assign(state, envValues)
-        }
-
-        // Migration from old presence message format to new phrase array format
-        if (state) {
-          const anyState = state as any
-          // presenceGreetingMessage -> presenceGreetingPhrases
-          if (typeof anyState.presenceGreetingMessage === 'string') {
-            // Empty string means "no greeting" intent, so set empty array
-            if (!state.presenceGreetingPhrases?.length) {
-              state.presenceGreetingPhrases = anyState.presenceGreetingMessage
-                ? [
-                    createIdlePhrase(
-                      anyState.presenceGreetingMessage,
-                      'happy',
-                      0
-                    ),
-                  ]
-                : []
-            }
-            delete anyState.presenceGreetingMessage
-          }
-          // presenceDepartureMessage -> presenceDeparturePhrases
-          if (typeof anyState.presenceDepartureMessage === 'string') {
-            // Empty string means "no departure message" intent, so set empty array
-            if (!state.presenceDeparturePhrases?.length) {
-              state.presenceDeparturePhrases = anyState.presenceDepartureMessage
-                ? [
-                    createIdlePhrase(
-                      anyState.presenceDepartureMessage,
-                      'neutral',
-                      0
-                    ),
-                  ]
-                : []
-            }
-            delete anyState.presenceDepartureMessage
-          }
-        }
-
-        // 環境変数で音声設定が指定されている場合は常に優先する
-        if (state && process.env.NEXT_PUBLIC_SELECT_VOICE) {
-          state.selectVoice =
-            process.env.NEXT_PUBLIC_SELECT_VOICE as AIVoice
-        }
-
-        // 環境変数でチャットログ幅が指定されている場合は常に優先する
-        if (state && process.env.NEXT_PUBLIC_CHAT_LOG_WIDTH) {
-          state.chatLogWidth =
-            parseFloat(process.env.NEXT_PUBLIC_CHAT_LOG_WIDTH) || 400
-        }
-      },
+      merge: mergePersistedSettings,
       partialize: (state) => ({
         openaiKey: state.openaiKey,
         anthropicKey: state.anthropicKey,
@@ -980,11 +1116,6 @@ const settingsStore = create<SettingsState>()(
         characterPosition: state.characterPosition,
         characterRotation: state.characterRotation,
         lightingIntensity: state.lightingIntensity,
-        nijivoiceApiKey: state.nijivoiceApiKey,
-        nijivoiceActorId: state.nijivoiceActorId,
-        nijivoiceSpeed: state.nijivoiceSpeed,
-        nijivoiceEmotionalLevel: state.nijivoiceEmotionalLevel,
-        nijivoiceSoundDuration: state.nijivoiceSoundDuration,
         modelType: state.modelType,
         selectedPNGTuberPath: state.selectedPNGTuberPath,
         pngTuberSensitivity: state.pngTuberSensitivity,
@@ -994,6 +1125,7 @@ const settingsStore = create<SettingsState>()(
         pngTuberScale: state.pngTuberScale,
         pngTuberOffsetX: state.pngTuberOffsetX,
         pngTuberOffsetY: state.pngTuberOffsetY,
+        // poseConfigs は開発者向け固定構成のため永続化しない（settings.ts の defaults を常に使用）
         neutralEmotions: state.neutralEmotions,
         happyEmotions: state.happyEmotions,
         sadEmotions: state.sadEmotions,
@@ -1030,7 +1162,6 @@ const settingsStore = create<SettingsState>()(
         includeSystemMessagesInCustomApi:
           state.includeSystemMessagesInCustomApi,
         customApiIncludeMimeType: state.customApiIncludeMimeType,
-        agentcoreBankId: state.agentcoreBankId,
         initialSpeechTimeout: state.initialSpeechTimeout,
         chatLogWidth: state.chatLogWidth,
         imageDisplayPosition: state.imageDisplayPosition,
@@ -1076,6 +1207,8 @@ const settingsStore = create<SettingsState>()(
         kioskMaxInputLength: state.kioskMaxInputLength,
         kioskNgWords: state.kioskNgWords,
         kioskNgWordEnabled: state.kioskNgWordEnabled,
+        thinkingPoseEnabled: state.thinkingPoseEnabled,
+        thinkingPoseId: state.thinkingPoseId,
       }),
     })
   )

@@ -66,6 +66,9 @@ export class SpeakQueue {
       PNGTuberHandler.stopSpeaking()
     } else {
       hs.viewer.model?.stopSpeaking()
+      if (hs.viewer.model?.poseManager?.isActive) {
+        hs.viewer.model?.poseManager?.resetToIdle(hs.viewer.model)
+      }
     }
     homeStore.setState({ isSpeaking: false })
   }
@@ -165,7 +168,57 @@ export class SpeakQueue {
       } else if (ss.modelType === 'pngtuber') {
         await PNGTuberHandler.resetToIdle()
       } else {
-        await hs.viewer.model?.playEmotion('neutral')
+        const initialPoseId = process.env.NEXT_PUBLIC_INITIAL_POSE_ID
+        const poseConfig = initialPoseId
+          ? ss.poseConfigs.find((p) => p.id === initialPoseId)
+          : undefined
+        const model = hs.viewer.model
+        const hasInitialPose =
+          !!initialPoseId && !!poseConfig && !!model
+
+        if (hasInitialPose && model?.poseManager?.isActive) {
+          // 初期ポーズは既にアクティブなので再適用せず、表情のみ初期状態に戻す。
+          // applyPose を呼ぶと fadeOut→fadeIn と hips.position 焼き付けで
+          // モデルが一瞬中間ポーズを経由して横にずれてしまうため。
+          if (poseConfig?.expression) {
+            if (typeof poseConfig.expression === 'string') {
+              model.emoteController?.playEmotion(poseConfig.expression)
+            } else {
+              model.emoteController?.playEmotionMix(poseConfig.expression)
+            }
+          } else {
+            await model.playEmotion('neutral')
+          }
+        } else if (hasInitialPose && model && poseConfig) {
+          // 何らかの理由で初期ポーズが外れている場合のみ再適用する。
+          try {
+            await model.poseManager?.applyPose(
+              model,
+              initialPoseId!,
+              poseConfig
+            )
+            if (poseConfig.expression) {
+              if (typeof poseConfig.expression === 'string') {
+                model.emoteController?.playEmotion(poseConfig.expression)
+              } else {
+                model.emoteController?.playEmotionMix(poseConfig.expression)
+              }
+            } else {
+              await model.playEmotion('neutral')
+            }
+          } catch (err) {
+            console.warn('初期ポーズの再適用に失敗しました:', err)
+            await model.playEmotion('neutral')
+            if (model.poseManager?.isActive) {
+              model.poseManager.resetToIdle(model)
+            }
+          }
+        } else {
+          await hs.viewer.model?.playEmotion('neutral')
+          if (hs.viewer.model?.poseManager?.isActive) {
+            hs.viewer.model?.poseManager?.resetToIdle(hs.viewer.model)
+          }
+        }
       }
     }
   }

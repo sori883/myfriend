@@ -15,10 +15,15 @@ export interface RestrictedModeErrorResponse {
 
 /**
  * サーバーサイド用制限モード判定
+ *
+ * Vercel デプロイ前提への移行に伴い、常に false を返すスタブ実装。
+ * ローカル時はローカルファイルシステム、Vercel 本番時は @vercel/blob への
+ * 分岐は後続タスクでこの関数を置き換える形で導入予定。
+ *
  * @returns 制限モードが有効な場合はtrue
  */
 export function isRestrictedMode(): boolean {
-  return process.env.NEXT_PUBLIC_RESTRICTED_MODE === 'true'
+  return false
 }
 
 /**

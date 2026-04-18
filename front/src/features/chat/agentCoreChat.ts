@@ -1,7 +1,8 @@
-import { Message } from '@/features/messages/messages'
-import settingsStore from '@/features/stores/settings'
 import i18next from 'i18next'
+import homeStore from '@/features/stores/home'
 import toastStore from '@/features/stores/toast'
+import settingsStore from '@/features/stores/settings'
+import { Message } from '../messages/messages'
 
 function handleApiError(errorCode: string): string {
   const languageCode = settingsStore.getState().selectLanguage
@@ -9,64 +10,84 @@ function handleApiError(errorCode: string): string {
   return i18next.t(`Errors.${errorCode || 'AIAPIError'}`)
 }
 
+type CharacterState = {
+  expression: string
+  pose: string | null
+}
+
+function getCurrentCharacterState(): CharacterState {
+  const viewer = homeStore.getState().viewer
+  const model = viewer?.model
+  const expression = model?.emoteController?.getCurrentEmotion?.() ?? 'neutral'
+  const pose = model?.poseManager?.getCurrentPoseName?.() ?? null
+  return { expression, pose }
+}
+
+/**
+ * AgentCore（proxy Lambda 経由）からプレーンテキストストリームを受け取り、
+ * ReadableStream<string> として返す。
+ */
 export async function getAgentCoreChatResponseStream(
   messages: Message[]
 ): Promise<ReadableStream<string>> {
+  const characterState = getCurrentCharacterState()
   const response = await fetch('/api/ai/agentcore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, characterState }),
   })
 
   if (!response.ok) {
-    const responseBody = await response.json().catch(() => ({
-      error: 'Unknown error',
-      errorCode: 'AgentCoreAPIError',
-    }))
-    const errorMessage = handleApiError(responseBody.errorCode)
+    let errorCode = 'AIAPIError'
+    try {
+      const body = await response.json()
+      errorCode = body.errorCode || errorCode
+    } catch {
+      // ignore
+    }
+    const errorMessage = handleApiError(errorCode)
     toastStore.getState().addToast({
       message: errorMessage,
       type: 'error',
       tag: 'agentcore-api-error',
     })
-    throw new Error(
-      `AgentCore API request failed with status ${response.status}: ${responseBody.error}`,
-      { cause: { errorCode: responseBody.errorCode } }
-    )
+    throw new Error(`AgentCore request failed (${response.status})`, {
+      cause: { errorCode },
+    })
   }
 
-  // AgentCore はプレーンテキストストリームを返す
-  return new ReadableStream({
+  return new ReadableStream<string>({
     async start(controller) {
-      if (!response.body) {
-        throw new Error('AgentCore response body is empty', {
-          cause: { errorCode: 'AgentCoreAPIError' },
-        })
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder('utf-8')
-
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
       try {
+        if (!response.body) {
+          throw new Error('AgentCore response body is empty', {
+            cause: { errorCode: 'AIAPIError' },
+          })
+        }
+
+        reader = response.body.getReader()
+        const decoder = new TextDecoder('utf-8')
+
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-
           const chunk = decoder.decode(value, { stream: true })
-          if (chunk) {
-            controller.enqueue(chunk)
-          }
+          if (chunk) controller.enqueue(chunk)
         }
+        // 末尾の残りを flush
+        const tail = decoder.decode()
+        if (tail) controller.enqueue(tail)
       } catch (error) {
-        const errorMessage = handleApiError('AIAPIError')
+        console.error('Error reading AgentCore stream:', error)
         toastStore.getState().addToast({
-          message: errorMessage,
+          message: i18next.t('Errors.AIAPIError'),
           type: 'error',
           tag: 'agentcore-api-error',
         })
       } finally {
         controller.close()
-        reader.releaseLock()
+        if (reader) reader.releaseLock()
       }
     },
   })

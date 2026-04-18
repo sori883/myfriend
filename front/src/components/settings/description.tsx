@@ -37,7 +37,7 @@ const Description = () => {
               href="https://twitter.com/tegnike"
               className="text-black hover:text-gray-800 hover:underline transition-all duration-300 ease-in-out"
             >
-              Twitter: @tegnike
+              X(Twitter): @tegnike
             </a>
           </div>
         </div>
@@ -71,6 +71,30 @@ const Description = () => {
             </a>
           </div>
         </div>
+        <div className="mt-10">
+          <div className="mb-4 text-xl font-bold">{t('Promotion')}</div>
+          <div className="my-2 text-sm whitespace-pre-wrap">
+            {t('PromotionDescription')}
+          </div>
+          <div className="my-2 text-sm whitespace-pre-wrap">
+            <a
+              href="https://promotion.aituberkit.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-black hover:text-gray-800 hover:underline transition-all duration-300 ease-in-out"
+            >
+              https://promotion.aituberkit.com/
+            </a>
+          </div>
+        </div>
+
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+          <div className="mt-10 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+            <p className="mb-1">{t('DemoModeAppNotice')}</p>
+            <p className="mb-2">{t('DemoModeLimitedFeaturesNotice')}</p>
+            <p className="text-yellow-700">⚠ {t('DemoModeLogNotice')}</p>
+          </div>
+        )}
       </div>
     </>
   )

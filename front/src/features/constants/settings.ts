@@ -59,9 +59,8 @@ export const isVercelLocalAIService = (
 }
 
 export type DifyService = 'dify'
-export type AgentCoreService = 'agentcore'
 
-export type AIService = VercelAIService | DifyService | AgentCoreService
+export type AIService = VercelAIService | DifyService
 
 export interface AIServiceConfig {
   openai: { key: string; model: string }
@@ -86,7 +85,6 @@ export interface AIServiceConfig {
 }
 
 export type AIVoice =
-  | 'none'
   | 'koeiromap'
   | 'google'
   | 'voicevox'

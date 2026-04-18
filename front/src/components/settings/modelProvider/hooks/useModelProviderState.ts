@@ -63,7 +63,6 @@ export const useModelProviderState = () => {
   const customApiIncludeMimeType = settingsStore(
     (s) => s.customApiIncludeMimeType
   )
-  const agentcoreBankId = settingsStore((s) => s.agentcoreBankId)
 
   const isMultiModalSupported = useMemo(
     () =>
@@ -138,7 +137,6 @@ export const useModelProviderState = () => {
     customApiStream,
     includeSystemMessagesInCustomApi,
     customApiIncludeMimeType,
-    agentcoreBankId,
     isMultiModalSupported,
     isReasoningSupported,
     availableReasoningEfforts,

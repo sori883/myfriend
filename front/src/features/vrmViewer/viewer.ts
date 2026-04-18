@@ -4,7 +4,6 @@ import { loadVRMAnimation } from '@/lib/VRMAnimation/loadVRMAnimation'
 import { buildUrl } from '@/utils/buildUrl'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import settingsStore from '@/features/stores/settings'
-import { decryptVrmData } from '@/utils/blobDecryption'
 
 /**
  * three.jsを使った3Dビューワー
@@ -22,7 +21,6 @@ export class Viewer {
   private _cameraControls?: OrbitControls
   private _directionalLight?: THREE.DirectionalLight
   private _ambientLight?: THREE.AmbientLight
-  private _currentBlobUrl?: string
 
   constructor() {
     this.isReady = false
@@ -51,21 +49,14 @@ export class Viewer {
     this._clock.start()
   }
 
-  public async loadVrm(url: string) {
+  public loadVrm(url: string) {
     if (this.model?.vrm) {
       this.unloadVRM()
     }
 
-    try {
-      // プライベート Blob URL の場合は暗号化プロキシ経由でアクセス
-      const resolvedUrl = url.includes('.private.blob.vercel-storage.com')
-        ? await this._resolveEncryptedBlobUrl(url)
-        : url
-
-      // gltf and vrm
-      this.model = new Model(this._camera || new THREE.Object3D())
-      await this.model.loadVRM(resolvedUrl)
-
+    // gltf and vrm
+    this.model = new Model(this._camera || new THREE.Object3D())
+    this.model.loadVRM(url).then(async () => {
       if (!this.model?.vrm) return
 
       // Disable frustum culling
@@ -73,76 +64,52 @@ export class Viewer {
         obj.frustumCulled = false
       })
 
+      this.model.vrm.scene.visible = false
       this._scene.add(this.model.vrm.scene)
 
-      const vrma = await loadVRMAnimation(buildUrl('/idle_loop.vrma'))
-      if (vrma) this.model.loadAnimation(vrma)
+      try {
+        const vrma = await loadVRMAnimation(buildUrl('/idle_loop.vrma'))
+        if (vrma) this.model.loadAnimation(vrma)
+      } finally {
+        this.model.vrm.scene.visible = true
+      }
+
+      // 初期ポーズ（.env の NEXT_PUBLIC_INITIAL_POSE_ID で指定）
+      const initialPoseId = process.env.NEXT_PUBLIC_INITIAL_POSE_ID
+      if (initialPoseId) {
+        const poseConfig = settingsStore
+          .getState()
+          .poseConfigs.find((p) => p.id === initialPoseId)
+        if (poseConfig && this.model) {
+          try {
+            await this.model.poseManager.applyPose(
+              this.model,
+              initialPoseId,
+              poseConfig
+            )
+            if (poseConfig.expression) {
+              if (typeof poseConfig.expression === 'string') {
+                this.model.emoteController?.playEmotion(poseConfig.expression)
+              } else {
+                this.model.emoteController?.playEmotionMix(
+                  poseConfig.expression
+                )
+              }
+            }
+          } catch (err) {
+            console.warn('初期ポーズの適用に失敗しました:', err)
+          }
+        }
+      }
 
       // HACK: アニメーションの原点がずれているので再生後にカメラ位置を調整する
       requestAnimationFrame(() => {
         this.resetCamera()
       })
-    } catch (error) {
-      console.error('VRM loading failed:', error)
-    }
-  }
-
-  /**
-   * 暗号化されたPrivate Blobを復号してblob URLを返す。
-   * 暗号化未設定の場合は生データからblob URLを生成する。
-   */
-  private async _resolveEncryptedBlobUrl(
-    originalUrl: string
-  ): Promise<string> {
-    const proxyUrl = `/api/blob-url?url=${encodeURIComponent(originalUrl)}`
-
-    const response = await fetch(proxyUrl)
-    if (!response.ok) {
-      throw new Error(`Blob fetch failed: ${response.status}`)
-    }
-
-    const isEncrypted = response.headers.get('X-Blob-Encrypted')
-
-    if (isEncrypted) {
-      const encryptedData = await response.arrayBuffer()
-
-      const keyResponse = await fetch(
-        `/api/blob-key?url=${encodeURIComponent(originalUrl)}`
-      )
-      if (!keyResponse.ok) {
-        throw new Error(`Key fetch failed: ${keyResponse.status}`)
-      }
-
-      const keyData = await keyResponse.json()
-      if (!keyData.key || !keyData.iv) {
-        throw new Error('Invalid key response: missing key or iv')
-      }
-
-      const decryptedData = await decryptVrmData(
-        encryptedData,
-        keyData.key,
-        keyData.iv
-      )
-      const blob = new Blob([decryptedData], {
-        type: 'application/octet-stream',
-      })
-      const blobUrl = URL.createObjectURL(blob)
-      this._currentBlobUrl = blobUrl
-      return blobUrl
-    }
-
-    const rawData = await response.arrayBuffer()
-    const blob = new Blob([rawData], { type: 'application/octet-stream' })
-    const blobUrl = URL.createObjectURL(blob)
-    this._currentBlobUrl = blobUrl
-    return blobUrl
+    })
   }
 
   public unloadVRM(): void {
-    if (this._currentBlobUrl) {
-      URL.revokeObjectURL(this._currentBlobUrl)
-      this._currentBlobUrl = undefined
-    }
     if (this.model?.vrm) {
       this._scene.remove(this.model.vrm.scene)
       this.model?.unLoadVrm()
@@ -167,8 +134,8 @@ export class Viewer {
 
     // camera
     this._camera = new THREE.PerspectiveCamera(20.0, width / height, 0.1, 20.0)
-    this._camera.position.set(0, 1.3, 1.5)
-    this._cameraControls?.target.set(0, 1.3, 0)
+    this._camera.position.set(0, 1.35, 1.3)
+    this._cameraControls?.target.set(0, 1.35, 0)
     this._cameraControls?.update()
     // camera controls
     this._cameraControls = new OrbitControls(
@@ -228,15 +195,22 @@ export class Viewer {
 
     const headNode = this.model?.vrm?.humanoid.getNormalizedBoneNode('head')
 
-    if (headNode) {
+    if (
+      headNode &&
+      this._camera &&
+      this._cameraControls &&
+      this.model?.vrm
+    ) {
       const headWPos = headNode.getWorldPosition(new THREE.Vector3())
-      this._camera?.position.set(
-        this._camera.position.x,
-        headWPos.y,
-        this._camera.position.z
-      )
-      this._cameraControls?.target.set(headWPos.x, headWPos.y, headWPos.z)
-      this._cameraControls?.update()
+      // VRM シーン自体を水平方向にオフセットして、頭の x 座標を 0 に揃える。
+      // これによりモデルは確実に画面中央に表示される（VRM モデルの内部原点が
+      // ずれていても、カメラ/ターゲット x=0 で常に中央に来る）。
+      this.model.vrm.scene.position.x -= headWPos.x
+      const offsetZ =
+        this._camera.position.z - this._cameraControls.target.z
+      this._camera.position.set(0, headWPos.y, headWPos.z + offsetZ)
+      this._cameraControls.target.set(0, headWPos.y, headWPos.z)
+      this._cameraControls.update()
     }
   }
 

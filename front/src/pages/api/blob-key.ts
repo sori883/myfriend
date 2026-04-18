@@ -59,8 +59,7 @@ export default async function handler(req: NextRequest) {
       }
     )
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error'
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
       JSON.stringify({ error: `Failed to derive key: ${message}` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

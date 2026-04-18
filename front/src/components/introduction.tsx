@@ -45,8 +45,8 @@ export const Introduction = () => {
   }
 
   return displayIntroduction && opened ? (
-    <div className="absolute z-40 w-full h-full px-6 py-10 bg-black/30 font-M_PLUS_2">
-      <div className="relative mx-auto my-auto max-w-3xl max-h-full p-6 overflow-y-auto bg-white rounded-2xl">
+    <div className="absolute z-40 w-full h-full px-3 sm:px-6 py-10 bg-black/30 font-M_PLUS_2">
+      <div className="relative mx-auto my-auto max-w-3xl max-h-full p-4 sm:p-6 overflow-y-auto bg-white rounded-2xl">
         <div className="sticky top-0 right-0 z-10 flex justify-end">
           <IconButton
             iconName="24/Close"
@@ -92,15 +92,10 @@ export const Introduction = () => {
               label={'OpenAI API'}
             />
             {t('TechnologyIntroductionDescription5')}
-            <Link
-              url={
-                'https://developers.rinna.co.jp/product/#product=koeiromap-free'
-              }
-              label={'Koemotion'}
-            />
+            <Link url={'https://voicevox.hiroshiba.jp/'} label={'VOICEVOX'} />
             {t('TechnologyIntroductionDescription6')}
             <Link
-              url={'https://note.com/nike_cha_n/n/ne98acb25e00f'}
+              url={'https://docs.aituberkit.com/'}
               label={t('TechnologyIntroductionLink2')}
             />
             {t('TechnologyIntroductionDescription7')}
@@ -143,10 +138,15 @@ export const Introduction = () => {
 
         {selectLanguage === 'ja' && (
           <div className="mt-6">
-            <p>
-              You can select the language from the settings. Japanese, English,
-              Traditional Chinese and Korean are available.
-            </p>
+            <p>You can select the language from the settings.</p>
+          </div>
+        )}
+
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+            <p className="mb-1">{t('DemoModeAppNotice')}</p>
+            <p className="mb-2">{t('DemoModeLimitedFeaturesNotice')}</p>
+            <p className="text-yellow-700">⚠ {t('DemoModeLogNotice')}</p>
           </div>
         )}
       </div>

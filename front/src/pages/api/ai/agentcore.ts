@@ -40,8 +40,9 @@ export default async function handler(req: NextRequest) {
     )
   }
 
-  const { messages } = (await req.json()) as {
+  const { messages, characterState } = (await req.json()) as {
     messages: Message[]
+    characterState?: { expression?: string; pose?: string | null }
   }
 
   // メッセージからテキストを抽出するヘルパー
@@ -107,7 +108,10 @@ export default async function handler(req: NextRequest) {
   )
   console.log(
     '[agentcore] all roles:',
-    messages.map((m) => `${m.role}:${typeof m.content === 'string' ? m.content.slice(0, 30) : 'array'}`)
+    messages.map(
+      (m) =>
+        `${m.role}:${typeof m.content === 'string' ? m.content.slice(0, 30) : 'array'}`
+    )
   )
 
   const invokeUrl = `${agentcoreUrl}/invoke`
@@ -121,6 +125,20 @@ export default async function handler(req: NextRequest) {
       headers['x-api-key'] = apiKey
     }
 
+    const characterStatePayload =
+      characterState && typeof characterState === 'object'
+        ? {
+            expression:
+              typeof characterState.expression === 'string'
+                ? characterState.expression
+                : 'neutral',
+            pose:
+              typeof characterState.pose === 'string'
+                ? characterState.pose
+                : null,
+          }
+        : null
+
     const agentResponse = await fetch(invokeUrl, {
       method: 'POST',
       headers,
@@ -128,6 +146,9 @@ export default async function handler(req: NextRequest) {
         bank_id: agentcoreBankId,
         prompt: prompt.trim(),
         messages: history,
+        ...(characterStatePayload && {
+          character_state: characterStatePayload,
+        }),
       }),
       signal: AbortSignal.timeout(180000),
     })
@@ -145,8 +166,63 @@ export default async function handler(req: NextRequest) {
       )
     }
 
-    // プレーンテキストストリームをそのままパイプスルー
-    return new Response(agentResponse.body, {
+    // プレーンテキストストリームを自前の ReadableStream でラップし、
+    // クライアント切断時の ECONNRESET 等を握りつぶして uncaughtException を防ぐ。
+    const upstream = agentResponse.body
+    if (!upstream) {
+      return new Response(
+        JSON.stringify({
+          error: 'AgentCore returned empty body',
+          errorCode: 'AgentCoreEmptyBody',
+        }),
+        {
+          status: 502,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    const safeStream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const reader = upstream.getReader()
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            try {
+              controller.enqueue(value)
+            } catch {
+              // コントローラーが既に閉じている（クライアント切断）
+              break
+            }
+          }
+        } catch (err) {
+          // upstream 読み取りエラー（接続切断など）。ログのみで握りつぶす。
+          console.warn('[agentcore] upstream read error:', err)
+        } finally {
+          try {
+            controller.close()
+          } catch {
+            // 既に close 済み
+          }
+          try {
+            reader.releaseLock()
+          } catch {
+            // ignore
+          }
+        }
+      },
+      async cancel() {
+        // クライアント切断時に upstream をキャンセル
+        try {
+          await upstream.cancel()
+        } catch {
+          // ignore
+        }
+      },
+    })
+
+    return new Response(safeStream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',

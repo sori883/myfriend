@@ -5,49 +5,25 @@ import {
 } from '@/utils/restrictedMode'
 
 describe('restrictedMode', () => {
-  const originalValue = process.env.NEXT_PUBLIC_RESTRICTED_MODE
-
-  beforeEach(() => {
-    jest.resetModules()
-  })
-
-  afterEach(() => {
-    if (originalValue === undefined) {
-      delete process.env.NEXT_PUBLIC_RESTRICTED_MODE
-    } else {
-      process.env.NEXT_PUBLIC_RESTRICTED_MODE = originalValue
-    }
-  })
-
   describe('isRestrictedMode', () => {
-    it('should return true when NEXT_PUBLIC_RESTRICTED_MODE is "true"', () => {
+    it('returns false (stubbed after Vercel migration)', () => {
+      expect(isRestrictedMode()).toBe(false)
+    })
+
+    it('ignores NEXT_PUBLIC_RESTRICTED_MODE environment variable', () => {
+      const original = process.env.NEXT_PUBLIC_RESTRICTED_MODE
       process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'true'
-      expect(isRestrictedMode()).toBe(true)
-    })
-
-    it('should return false when NEXT_PUBLIC_RESTRICTED_MODE is "false"', () => {
-      process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'false'
       expect(isRestrictedMode()).toBe(false)
-    })
-
-    it('should return false when NEXT_PUBLIC_RESTRICTED_MODE is undefined', () => {
-      delete process.env.NEXT_PUBLIC_RESTRICTED_MODE
-      expect(isRestrictedMode()).toBe(false)
-    })
-
-    it('should return false when NEXT_PUBLIC_RESTRICTED_MODE is empty string', () => {
-      process.env.NEXT_PUBLIC_RESTRICTED_MODE = ''
-      expect(isRestrictedMode()).toBe(false)
-    })
-
-    it('should return false when NEXT_PUBLIC_RESTRICTED_MODE is "TRUE" (case sensitive)', () => {
-      process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'TRUE'
-      expect(isRestrictedMode()).toBe(false)
+      if (original === undefined) {
+        delete process.env.NEXT_PUBLIC_RESTRICTED_MODE
+      } else {
+        process.env.NEXT_PUBLIC_RESTRICTED_MODE = original
+      }
     })
   })
 
   describe('createRestrictedModeErrorResponse', () => {
-    it('should return correct error response structure', () => {
+    it('returns correct error response structure', () => {
       const response = createRestrictedModeErrorResponse('upload-image')
 
       expect(response).toEqual({
@@ -56,19 +32,13 @@ describe('restrictedMode', () => {
       })
     })
 
-    it('should include feature name in message', () => {
+    it('includes feature name in message', () => {
       const response = createRestrictedModeErrorResponse('upload-image')
 
       expect(response.message).toContain('upload-image')
     })
 
-    it('should have correct error type', () => {
-      const response = createRestrictedModeErrorResponse('test-feature')
-
-      expect(response.error).toBe('feature_disabled_in_restricted_mode')
-    })
-
-    it('should satisfy RestrictedModeErrorResponse type', () => {
+    it('satisfies RestrictedModeErrorResponse type', () => {
       const response: RestrictedModeErrorResponse =
         createRestrictedModeErrorResponse('test')
 

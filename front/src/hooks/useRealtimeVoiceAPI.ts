@@ -353,17 +353,7 @@ export function useRealtimeVoiceAPI(
   )
 
   // ----- 音声認識オブジェクトの初期化とイベントハンドラ設定 -----
-  const speechRecognitionMode = settingsStore(
-    (s) => s.speechRecognitionMode
-  )
-  const realtimeAPIMode = settingsStore((s) => s.realtimeAPIMode)
-
   useEffect(() => {
-    // realtimeAPI + browser モードの場合のみ初期化
-    if (speechRecognitionMode !== 'browser' || !realtimeAPIMode) {
-      return
-    }
-
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition
 
@@ -427,8 +417,6 @@ export function useRealtimeVoiceAPI(
       clearSilenceDetection()
     }
   }, [
-    speechRecognitionMode,
-    realtimeAPIMode,
     selectLanguage,
     clearSilenceDetection,
     startSilenceDetection,

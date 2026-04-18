@@ -5,7 +5,6 @@ import Image from 'next/image'
 import settingsStore from '@/features/stores/settings'
 import toastStore from '@/features/stores/toast'
 import { ToggleSwitch } from '../toggleSwitch'
-import { isMultiModalAvailable } from '@/features/constants/aiModels'
 import { loadPreset } from '@/features/presets/presetLoader'
 
 const YouTube = () => {
@@ -17,10 +16,6 @@ const YouTube = () => {
   const onecommePort = settingsStore((s) => s.onecommePort)
   const externalLinkageMode = settingsStore((s) => s.externalLinkageMode)
   const selectAIService = settingsStore((s) => s.selectAIService)
-  const selectAIModel = settingsStore((s) => s.selectAIModel)
-  const enableMultiModal = settingsStore((s) => s.enableMultiModal)
-  const multiModalMode = settingsStore((s) => s.multiModalMode)
-  const customModel = settingsStore((s) => s.customModel)
 
   const youtubeCommentInterval = settingsStore((s) => s.youtubeCommentInterval)
   const conversationContinuityMode = settingsStore(
@@ -120,7 +115,7 @@ const YouTube = () => {
             </div>
             <div className="my-4 text-xl font-bold">{t('YoutubeAPIKey')}</div>
             <input
-              className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+              className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
               type="text"
               placeholder="..."
               value={youtubeApiKey}
@@ -132,7 +127,7 @@ const YouTube = () => {
             />
             <div className="my-4 text-xl font-bold">{t('YoutubeLiveID')}</div>
             <input
-              className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+              className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
               type="text"
               placeholder="..."
               value={youtubeLiveId}
@@ -152,7 +147,7 @@ const YouTube = () => {
             </div>
             <div className="my-4 text-xl font-bold">{t('OneCommePort')}</div>
             <input
-              className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+              className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
               type="number"
               placeholder="11180"
               value={onecommePort}
@@ -207,15 +202,7 @@ const YouTube = () => {
               })
             }
             disabled={
-              !isMultiModalAvailable(
-                selectAIService,
-                selectAIModel,
-                enableMultiModal,
-                multiModalMode,
-                customModel
-              ) ||
-              slideMode ||
-              externalLinkageMode
+              slideMode || externalLinkageMode || selectAIService === 'dify'
             }
           />
           {conversationContinuityMode && (

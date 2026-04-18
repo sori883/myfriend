@@ -1,30 +1,21 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
+import { loadVRMAnimation } from '@/lib/VRMAnimation/loadVRMAnimation'
+import { resolveVrmSource } from '@/utils/vrmResolver'
+import CharacterController from '@/components/characterController'
 
 export default function VrmViewer() {
-  const chatLogWidth = settingsStore((s) => s.chatLogWidth)
-
   const canvasRef = useCallback((canvas: HTMLCanvasElement) => {
     if (canvas) {
       const { viewer } = homeStore.getState()
       const { selectedVrmPath } = settingsStore.getState()
       viewer.setup(canvas)
-
-      // サーバー設定から VRM パスを取得（環境変数をクライアントに露出しない）
-      // サーバーに設定があればそちらを優先（Vercel Blob 等）
-      fetch('/api/server-config')
-        .then((res) => res.json())
-        .then(({ selectedVrmPath: serverPath }) => {
-          const vrmPath = serverPath || selectedVrmPath
-          if (vrmPath) {
-            settingsStore.setState({ selectedVrmPath: vrmPath })
-            viewer.loadVrm(vrmPath)
-          }
-        })
-        .catch(() => {
-          // フォールバック: settingsStore の値を使用
+      resolveVrmSource(selectedVrmPath)
+        .then((src) => viewer.loadVrm(src))
+        .catch((err) => {
+          console.error('Failed to resolve/load VRM:', err)
           viewer.loadVrm(selectedVrmPath)
         })
 
@@ -50,6 +41,17 @@ export default function VrmViewer() {
           const blob = new Blob([file], { type: 'application/octet-stream' })
           const url = window.URL.createObjectURL(blob)
           viewer.loadVrm(url)
+        } else if (file_type === 'vrma') {
+          const blob = new Blob([file], { type: 'application/octet-stream' })
+          const url = window.URL.createObjectURL(blob)
+          loadVRMAnimation(url)
+            .then((vrma) => {
+              if (vrma) viewer.model?.loadAnimation(vrma)
+            })
+            .catch((error) => {
+              console.error('Failed to load VRMA:', error)
+            })
+            .finally(() => URL.revokeObjectURL(url))
         } else if (file.type.startsWith('image/')) {
           const reader = new FileReader()
           reader.readAsDataURL(file)
@@ -62,23 +64,14 @@ export default function VrmViewer() {
     }
   }, [])
 
-  // chatLogWidth 変更時に Three.js レンダラーをリサイズ
-  useEffect(() => {
-    const { viewer } = homeStore.getState()
-    // レイアウト反映を待ってからリサイズ
-    const id = requestAnimationFrame(() => viewer.resize())
-    return () => cancelAnimationFrame(id)
-  }, [chatLogWidth])
+  const poseAdjustMode = settingsStore((s) => s.poseAdjustMode)
 
   return (
-    <div
-      className={'absolute top-0 h-[100svh] z-5'}
-      style={{
-        left: `${chatLogWidth}px`,
-        width: `calc(100vw - ${chatLogWidth}px)`,
-      }}
-    >
-      <canvas ref={canvasRef} className={'h-full w-full'}></canvas>
-    </div>
+    <>
+      <div className={'absolute top-0 left-0 w-screen h-[100svh] z-5'}>
+        <canvas ref={canvasRef} className={'h-full w-full'}></canvas>
+      </div>
+      {poseAdjustMode && <CharacterController />}
+    </>
   )
 }

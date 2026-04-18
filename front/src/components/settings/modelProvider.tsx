@@ -102,7 +102,7 @@ const ModelProvider = () => {
                 <br />
                 {selectAIService === 'ollama' && (
                   <>
-                    ex. http://localhost:11434/api
+                    ex. http://localhost:11434
                     <br />
                   </>
                 )}
@@ -111,7 +111,7 @@ const ModelProvider = () => {
                 )}
               </div>
               <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                 type="text"
                 placeholder="..."
                 value={state.localLlmUrl}
@@ -123,7 +123,7 @@ const ModelProvider = () => {
             <div className="my-6">
               <div className="my-4 text-xl font-bold">{t('SelectModel')}</div>
               <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                 type="text"
                 placeholder="..."
                 value={state.selectAIModel}
@@ -143,34 +143,6 @@ const ModelProvider = () => {
           </>
         )
 
-      case 'agentcore':
-        return (
-          <>
-            <div className="my-6">
-              <div className="my-2 text-sm whitespace-pre-wrap">
-                Bedrock AgentCore バックエンドに接続します。
-                LLMの設定はバックエンド側で管理されるため、APIキーやモデル選択は不要です。
-                接続先URLはサーバー側の環境変数 AGENTCORE_URL で設定してください。
-              </div>
-            </div>
-            <div className="my-6">
-              <div className="my-4 text-xl font-bold">Bank ID</div>
-              <div className="my-2 text-sm whitespace-pre-wrap">
-                メモリバンクのUUID。ユーザーごとに異なるbank_idを使用します。
-              </div>
-              <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
-                type="text"
-                placeholder="00000000-0000-4000-8000-000000000001"
-                value={state.agentcoreBankId}
-                onChange={(e) =>
-                  settingsStore.setState({ agentcoreBankId: e.target.value })
-                }
-              />
-            </div>
-          </>
-        )
-
       case 'dify':
         return (
           <>
@@ -182,7 +154,7 @@ const ModelProvider = () => {
                 {t('DifyAPIKeyLabel')}
               </div>
               <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                 type="password"
                 placeholder="..."
                 value={state.difyKey}
@@ -197,7 +169,7 @@ const ModelProvider = () => {
                 {t('DifyInfo3')}
               </div>
               <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                 type="text"
                 placeholder="..."
                 value={state.difyUrl}
@@ -220,7 +192,7 @@ const ModelProvider = () => {
                 {t('CustomAPIEndpointInfo')}
               </div>
               <input
-                className="text-ellipsis px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                 type="text"
                 placeholder="https://example.com/api/chat"
                 value={state.customApiUrl}
@@ -320,6 +292,24 @@ const ModelProvider = () => {
                 </div>
               </div>
             )}
+            <div className="border-t border-gray-300 pt-6 my-6">
+              <div className="my-4 text-xl font-bold">
+                {t('ShowThinkingText')}
+              </div>
+              <div className="my-2 text-sm whitespace-pre-wrap">
+                {t('ShowThinkingTextInfo')}
+              </div>
+              <div className="my-2">
+                <ToggleSwitch
+                  enabled={state.showThinkingText}
+                  onChange={(v) =>
+                    settingsStore.setState({
+                      showThinkingText: v,
+                    })
+                  }
+                />
+              </div>
+            </div>
           </>
         )
 
@@ -395,7 +385,7 @@ const ModelProvider = () => {
 
       {renderServiceConfiguration()}
 
-      {state.selectAIService !== 'dify' && state.selectAIService !== 'agentcore' && (
+      {state.selectAIService !== 'dify' && (
         <>
           {!state.realtimeAPIMode &&
             !state.audioMode &&
@@ -429,7 +419,7 @@ const ModelProvider = () => {
                               {t('ReasoningEffortInfo')}
                             </div>
                             <select
-                              className="px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                              className="px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                               value={state.reasoningEffort}
                               onChange={(e) =>
                                 settingsStore.setState({
@@ -547,7 +537,7 @@ const ModelProvider = () => {
               </div>
               <div className="my-2">
                 <select
-                  className="px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+                  className="px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
                   value={state.multiModalMode}
                   onChange={(e) =>
                     settingsStore.setState({
@@ -598,7 +588,7 @@ const ModelProvider = () => {
       )}
 
       {state.isMultiModalSupported && (
-        <div className="border-t border-gray-300 pt-6 my-6">
+        <div className="pt-6 my-6">
           <div className="my-4 text-xl font-bold">
             {t('ImageDisplayPosition')}
           </div>
@@ -607,7 +597,7 @@ const ModelProvider = () => {
           </div>
           <div className="my-2">
             <select
-              className="px-4 py-2 w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+              className="px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
               value={state.imageDisplayPosition}
               onChange={(e) =>
                 settingsStore.setState({

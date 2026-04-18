@@ -91,11 +91,8 @@ export default async function handler(
     res.setHeader('Cache-Control', 'private, no-store')
     return res.send(Buffer.from(rawData))
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error'
-    return res
-      .status(500)
-      .json({ error: `Failed to proxy blob: ${message}` })
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return res.status(500).json({ error: `Failed to proxy blob: ${message}` })
   } finally {
     clearTimeout(timeoutId)
   }

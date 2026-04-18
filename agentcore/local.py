@@ -9,6 +9,7 @@ Hosts the agent on http://localhost:8080/invoke
 from dotenv import load_dotenv
 load_dotenv(".env.local")
 
+import asyncio
 import logging
 import os
 
@@ -18,7 +19,7 @@ from core import validate_bank_id, stream_agent, shutdown
 
 logger = logging.getLogger(__name__)
 
-AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 
 async def handle_invoke(request: web.Request) -> web.StreamResponse:
@@ -39,7 +40,15 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
         return web.json_response({"error": "prompt must be a non-empty string"}, status=400)
 
     history = body.get("messages", [])
-    logger.info("Received %d history messages, prompt: %s", len(history), prompt[:100])
+    character_state = body.get("character_state")
+    if character_state is not None and not isinstance(character_state, dict):
+        character_state = None
+    logger.info(
+        "Received %d history messages, prompt: %s, character_state: %s",
+        len(history),
+        prompt[:100],
+        character_state,
+    )
     if history:
         logger.info("History sample: %s", history[:2])
 
@@ -50,13 +59,32 @@ async def handle_invoke(request: web.Request) -> web.StreamResponse:
     await response.prepare(request)
 
     try:
-        async for chunk in stream_agent(bank_id, prompt.strip(), AGENT_MODEL_ID, history):
-            await response.write(chunk.encode("utf-8"))
+        async for chunk in stream_agent(
+            bank_id,
+            prompt.strip(),
+            AGENT_MODEL_ID,
+            history,
+            character_state=character_state,
+        ):
+            try:
+                await response.write(chunk.encode("utf-8"))
+            except (ConnectionError, asyncio.CancelledError):
+                logger.info("Client disconnected during streaming; stopping")
+                return response
+    except (ConnectionError, asyncio.CancelledError):
+        logger.info("Client disconnected during streaming; stopping")
+        return response
     except Exception:
         logger.error("Agent stream error", exc_info=True)
-        await response.write(b"\n[Error: Agent execution failed]")
+        try:
+            await response.write(b"\n[Error: Agent execution failed]")
+        except (ConnectionError, asyncio.CancelledError):
+            return response
 
-    await response.write_eof()
+    try:
+        await response.write_eof()
+    except (ConnectionError, asyncio.CancelledError):
+        logger.info("Client disconnected before write_eof; ignoring")
     return response
 
 

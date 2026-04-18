@@ -11,6 +11,7 @@ interface Props {
   readonly auroraSecurityGroup: ec2.ISecurityGroup;
   readonly minAcu: number;
   readonly maxAcu: number;
+  readonly autoPauseMinutes?: number;
   readonly backupRetentionDays: number;
   readonly deletionProtection: boolean;
   readonly removalPolicy: cdk.RemovalPolicy;
@@ -31,6 +32,7 @@ export class Database extends Construct {
       auroraSecurityGroup,
       minAcu,
       maxAcu,
+      autoPauseMinutes,
       backupRetentionDays,
       deletionProtection,
       removalPolicy,
@@ -56,6 +58,10 @@ export class Database extends Construct {
       }),
       serverlessV2MinCapacity: minAcu,
       serverlessV2MaxCapacity: maxAcu,
+      serverlessV2AutoPauseDuration:
+        minAcu === 0 && autoPauseMinutes
+          ? cdk.Duration.minutes(autoPauseMinutes)
+          : undefined,
       credentials: rds.Credentials.fromSecret(this.secret),
       defaultDatabaseName: this.databaseName,
       vpc,

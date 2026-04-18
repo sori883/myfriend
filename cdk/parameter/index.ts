@@ -8,7 +8,7 @@ export type ParameterType = ReturnType<typeof parameter>;
 
 export const parameter = (envName: EnvNameType) => ({
   prefix: envName,
-  region: 'us-east-1',
+  region: 'ap-northeast-1',
   owner: 'sori883',
   project: 'myfriend',
   cost: `myfriend-${envName}`,
@@ -19,11 +19,12 @@ export const parameter = (envName: EnvNameType) => ({
 const envDiffParameter = (envName: EnvNameType) => {
   const params = {
     prd: {
+      memoryEnabled: false,
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
-        agentCoreExcludeAzs: ['us-east-1b'],
+        agentCoreExcludeAzs: [] as string[],
         subnets: {
           Private1: {
             name: 'Private1',
@@ -38,8 +39,9 @@ const envDiffParameter = (envName: EnvNameType) => {
         },
       },
       aurora: {
-        minAcu: 0.5,
+        minAcu: 0,
         maxAcu: 8,
+        autoPauseMinutes: 5,
         backupRetentionDays: 7,
         deletionProtection: true,
         removalPolicy: RemovalPolicy.RETAIN,
@@ -55,11 +57,12 @@ const envDiffParameter = (envName: EnvNameType) => {
       },
     },
     stg: {
+      memoryEnabled: false,
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
-        agentCoreExcludeAzs: ['us-east-1b'],
+        agentCoreExcludeAzs: [] as string[],
         subnets: {
           Private1: {
             name: 'Private1',
@@ -74,8 +77,9 @@ const envDiffParameter = (envName: EnvNameType) => {
         },
       },
       aurora: {
-        minAcu: 0.5,
+        minAcu: 0,
         maxAcu: 2,
+        autoPauseMinutes: 5,
         backupRetentionDays: 1,
         deletionProtection: false,
         removalPolicy: RemovalPolicy.DESTROY,
@@ -91,11 +95,12 @@ const envDiffParameter = (envName: EnvNameType) => {
       },
     },
     dev: {
+      memoryEnabled: false,
       vpc: {
         cidr: '10.0.0.0/16',
         maxAzs: 2,
         publicNats: 1,
-        agentCoreExcludeAzs: ['us-east-1b'],
+        agentCoreExcludeAzs: [] as string[],
         subnets: {
           Private1: {
             name: 'Private1',
@@ -110,8 +115,9 @@ const envDiffParameter = (envName: EnvNameType) => {
         },
       },
       aurora: {
-        minAcu: 0.5,
+        minAcu: 0,
         maxAcu: 2,
+        autoPauseMinutes: 5,
         backupRetentionDays: 1,
         deletionProtection: false,
         removalPolicy: RemovalPolicy.DESTROY,

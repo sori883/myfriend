@@ -11,12 +11,10 @@ import Live2DViewer from '@/components/live2DViewer'
 import PNGTuberViewer from '@/components/pngTuberViewer'
 import { Toasts } from '@/components/toasts'
 import { WebSocketManager } from '@/components/websocketManager'
-import CharacterPresetMenu from '@/components/characterPresetMenu'
 import ImageOverlay from '@/components/ImageOverlay'
 import PresenceManager from '@/components/presenceManager'
 import IdleManager from '@/components/idleManager'
 import { KioskOverlay } from '@/features/kiosk/kioskOverlay'
-import { EmotionDebugPanel } from '@/components/emotionDebugPanel'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import '@/lib/i18n'
@@ -111,12 +109,12 @@ const Home = () => {
     <div className="h-[100svh] bg-cover" style={backgroundStyle}>
       <Meta />
       <Introduction />
-      {modelType === 'vrm' ? (
-        <VrmViewer />
-      ) : modelType === 'live2d' && isLive2DEnabled ? (
+      {modelType === 'live2d' && isLive2DEnabled ? (
         <Live2DViewer />
-      ) : (
+      ) : modelType === 'pngtuber' ? (
         <PNGTuberViewer />
+      ) : (
+        <VrmViewer />
       )}
       <Form />
       <Menu />
@@ -126,14 +124,12 @@ const Home = () => {
       <WebSocketManager />
       <YoutubeManager />
       <MemoryServiceInitializer />
-      <CharacterPresetMenu />
       <ImageOverlay />
       <PresenceManager />
       <div className="absolute top-4 left-4 z-30">
         <IdleManager />
       </div>
       <KioskOverlay />
-      <EmotionDebugPanel />
     </div>
   )
 }

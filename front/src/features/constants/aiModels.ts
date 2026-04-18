@@ -335,7 +335,6 @@ const modelDefinitions: Record<AIService, ModelInfo[]> = {
   ollama: [],
   dify: [],
   'custom-api': [],
-  agentcore: [],
 }
 
 /**

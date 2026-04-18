@@ -61,6 +61,8 @@ public/scripts/live2dcubismcore.min.js
 !/public/vrm/nikechan_v1.vrm
 !/public/vrm/nikechan_v2.vrm
 !/public/vrm/nikechan_v2_outerwear.vrm
+!/public/vrm/Mafuyu_VRM.vrm
+!/public/vrm/Mafuyu_Another_VRM.vrm
 
 # Background files
 /public/backgrounds/*
@@ -80,3 +82,20 @@ public/pngtuber/*
 
 # Playwright reports
 /reports
+
+# Cloudflare
+.open-next
+.public-stash
+
+aituber-kit-lp/*
+aituber-kit-docs/*
+promo-video/*
+.claude/skills/remotion-*
+
+# Local caches
+.mypy_cache
+.swc
+.wrangler
+
+# Mafuyu reference assets (large binaries, local only)
+/docs/Mafuyu_v1.0.7/

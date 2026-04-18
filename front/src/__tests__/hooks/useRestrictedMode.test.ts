@@ -13,32 +13,18 @@ describe('useRestrictedMode', () => {
     process.env = originalEnv
   })
 
-  it('should return isRestrictedMode as true when NEXT_PUBLIC_RESTRICTED_MODE is "true"', () => {
+  it('returns isRestrictedMode as false (stubbed after Vercel migration)', () => {
+    const { result } = renderHook(() => useRestrictedMode())
+    expect(result.current.isRestrictedMode).toBe(false)
+  })
+
+  it('ignores NEXT_PUBLIC_RESTRICTED_MODE environment variable', () => {
     process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'true'
     const { result } = renderHook(() => useRestrictedMode())
-    expect(result.current.isRestrictedMode).toBe(true)
-  })
-
-  it('should return isRestrictedMode as false when NEXT_PUBLIC_RESTRICTED_MODE is "false"', () => {
-    process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'false'
-    const { result } = renderHook(() => useRestrictedMode())
     expect(result.current.isRestrictedMode).toBe(false)
   })
 
-  it('should return isRestrictedMode as false when NEXT_PUBLIC_RESTRICTED_MODE is undefined', () => {
-    delete process.env.NEXT_PUBLIC_RESTRICTED_MODE
-    const { result } = renderHook(() => useRestrictedMode())
-    expect(result.current.isRestrictedMode).toBe(false)
-  })
-
-  it('should return isRestrictedMode as false when NEXT_PUBLIC_RESTRICTED_MODE is empty string', () => {
-    process.env.NEXT_PUBLIC_RESTRICTED_MODE = ''
-    const { result } = renderHook(() => useRestrictedMode())
-    expect(result.current.isRestrictedMode).toBe(false)
-  })
-
-  it('should memoize the result', () => {
-    process.env.NEXT_PUBLIC_RESTRICTED_MODE = 'true'
+  it('memoizes the result across re-renders', () => {
     const { result, rerender } = renderHook(() => useRestrictedMode())
     const firstResult = result.current
 

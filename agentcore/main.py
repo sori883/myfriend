@@ -9,39 +9,56 @@ from urllib.parse import quote_plus
 
 logger = logging.getLogger(__name__)
 
+# 記憶機能の有効/無効フラグ。DB 接続情報が揃っていれば True、なければ False。
+# core.py から参照され、ツール呼び出し時に短絡判定する。
+MEMORY_ENABLED = False
 
-def _resolve_database_url() -> None:
-    """DATABASE_URL を解決する。ローカルは環境変数、CDK は Secrets Manager。"""
+
+def _resolve_database_url() -> bool:
+    """DATABASE_URL を解決する。解決できれば True、できなければ False。
+
+    MemoryStack 未デプロイ時は DB_SECRET_ARN も DATABASE_URL も無い状態になるため、
+    例外を投げずに False を返してアプリ起動は継続させる（記憶機能のみ無効化）。
+    """
     secret_arn = os.environ.get("DB_SECRET_ARN")
 
-    # DB_SECRET_ARN が設定されている場合は常に Secrets Manager から解決する
-    # (.env の DATABASE_URL よりも優先)
     if not secret_arn:
         if os.environ.get("DATABASE_URL"):
-            return
-        raise RuntimeError("DATABASE_URL or DB_SECRET_ARN must be set")
+            return True
+        logger.warning(
+            "No DB_SECRET_ARN or DATABASE_URL configured. Memory features disabled."
+        )
+        return False
 
-    import boto3
+    try:
+        import boto3
 
-    region = os.environ.get("AWS_REGION", "ap-northeast-1")
-    client = boto3.client("secretsmanager", region_name=region)
-    response = client.get_secret_value(SecretId=secret_arn)
-    secret = json.loads(response["SecretString"])
+        region = os.environ.get("AWS_REGION", "ap-northeast-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId=secret_arn)
+        secret = json.loads(response["SecretString"])
 
-    host = os.environ.get("DB_HOST", secret.get("host", "localhost"))
-    port = secret.get("port", 5432)
-    username = quote_plus(secret["username"])
-    password = quote_plus(secret["password"])
-    dbname = os.environ.get("DB_NAME", secret.get("dbname", "myfriend"))
+        host = os.environ.get("DB_HOST", secret.get("host", "localhost"))
+        port = secret.get("port", 5432)
+        username = quote_plus(secret["username"])
+        password = quote_plus(secret["password"])
+        dbname = os.environ.get("DB_NAME", secret.get("dbname", "myfriend"))
 
-    os.environ["DATABASE_URL"] = (
-        f"postgresql://{username}:{password}@{host}:{port}/{dbname}"
-    )
-    os.environ["DB_USE_SSL"] = "true"
-    logger.info("DATABASE_URL resolved from Secrets Manager (host=%s)", host)
+        os.environ["DATABASE_URL"] = (
+            f"postgresql://{username}:{password}@{host}:{port}/{dbname}"
+        )
+        os.environ["DB_USE_SSL"] = "true"
+        logger.info("DATABASE_URL resolved from Secrets Manager (host=%s)", host)
+        return True
+    except Exception:
+        logger.warning(
+            "Failed to resolve DATABASE_URL. Memory features disabled.",
+            exc_info=True,
+        )
+        return False
 
 
-_resolve_database_url()
+MEMORY_ENABLED = _resolve_database_url()
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
@@ -49,7 +66,7 @@ from core import validate_bank_id, stream_agent, shutdown_sync
 
 app = BedrockAgentCoreApp()
 
-AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 atexit.register(shutdown_sync)
 
