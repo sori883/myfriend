@@ -36,14 +36,24 @@ export const ConversationBubble = () => {
 
   if (!chatLog || chatLog.length === 0) return null
 
-  let lastAssistant: Message | undefined
+  // 最後の user メッセージを先に探し、その後に出現する assistant を拾う。
+  // こうすることで、ユーザー送信直後（assistant 未到着）でも user 発話を即座に表示できる。
   let lastUser: Message | undefined
+  let lastAssistant: Message | undefined
+  let lastUserIdx = -1
   for (let i = chatLog.length - 1; i >= 0; i--) {
-    const m = chatLog[i]
-    if (!lastAssistant && m.role === 'assistant') lastAssistant = m
-    if (lastAssistant && m.role === 'user') {
-      lastUser = m
+    if (chatLog[i].role === 'user') {
+      lastUserIdx = i
+      lastUser = chatLog[i]
       break
+    }
+  }
+  if (lastUserIdx >= 0) {
+    for (let i = lastUserIdx + 1; i < chatLog.length; i++) {
+      if (chatLog[i].role === 'assistant') {
+        lastAssistant = chatLog[i]
+        break
+      }
     }
   }
 
