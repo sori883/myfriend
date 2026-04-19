@@ -23,7 +23,10 @@ export default async function handler(req: NextRequest) {
   }
 
   // URL はサーバーサイド環境変数から取得（SSRF 防止）
-  const agentcoreUrl = process.env.AGENTCORE_URL || 'http://localhost:8080'
+  // 末尾スラッシュは除去（"/invoke" 結合時のダブルスラッシュを防ぐ）
+  const agentcoreUrl = (
+    process.env.AGENTCORE_URL || 'http://localhost:8080'
+  ).replace(/\/+$/, '')
 
   // bank_id はサーバーサイド環境変数から取得（クライアントに露出しない）
   const agentcoreBankId = process.env.AGENTCORE_BANK_ID

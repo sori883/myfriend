@@ -56,28 +56,38 @@ export default async function handler(
       })
     }
 
-    const logsDir = path.join(process.cwd(), 'logs')
+    // Vercel など read-only FS 環境ではローカルファイル保存をスキップ
+    const isReadOnlyFs = process.env.VERCEL === '1'
 
-    // logsディレクトリが存在しない場合は作成
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir)
-    }
-
-    // ファイル名の決定: isNewFile → targetFileName → 最新ファイル → 新規作成
     const newFileName = `log_${currentTime.replace(/[:.]/g, '-')}.json`
-    const fileName = isNewFile
-      ? newFileName
-      : targetFileName || getLatestLogFile(logsDir) || newFileName
+    let fileName = newFileName
 
-    const filePath = path.join(logsDir, fileName)
+    if (!isReadOnlyFs) {
+      const logsDir = path.join(process.cwd(), 'logs')
 
-    // 上書きモードでなければ既存メッセージを読み込んで追記
-    const allMessages = overwrite
-      ? newMessages
-      : [...readExistingMessages(filePath, fileName), ...newMessages]
+      // logsディレクトリが存在しない場合は作成
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir)
+      }
 
-    // メッセージ配列を保存
-    fs.writeFileSync(filePath, JSON.stringify(allMessages, null, 2))
+      // ファイル名の決定: isNewFile → targetFileName → 最新ファイル → 新規作成
+      fileName = isNewFile
+        ? newFileName
+        : targetFileName || getLatestLogFile(logsDir) || newFileName
+
+      const filePath = path.join(logsDir, fileName)
+
+      // 上書きモードでなければ既存メッセージを読み込んで追記
+      const allMessages = overwrite
+        ? newMessages
+        : [...readExistingMessages(filePath, fileName), ...newMessages]
+
+      // メッセージ配列を保存
+      fs.writeFileSync(filePath, JSON.stringify(allMessages, null, 2))
+    } else {
+      // Vercel 環境ではファイル名のみ決定（Supabase 保存に使用）
+      fileName = isNewFile ? newFileName : targetFileName || newFileName
+    }
 
     if (supabase) {
       const { data: existingSession } = await supabase
