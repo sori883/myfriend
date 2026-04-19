@@ -325,8 +325,14 @@ AGENTCORE_API_KEY=<Step 5 で取得した API Key>
 AGENTCORE_BANK_ID=00000000-0000-4000-8000-000000000001
 
 # Vercel Blob 暗号化配信
+BLOB_READ_WRITE_TOKEN=<Blob ストア作成時に Vercel が自動注入>
 BLOB_ENCRYPTION_SECRET=<openssl rand -hex 32>
 NEXT_PUBLIC_SELECTED_VRM_PATH=<Step 3 で取得した Private Blob URL>
+
+# 基本設定
+NEXT_PUBLIC_SELECT_LANGUAGE=ja
+NEXT_PUBLIC_CHARACTER_NAME=まふゆ
+NEXT_PUBLIC_MODEL_TYPE=vrm
 
 # UI 表示制御
 NEXT_PUBLIC_SHOW_ASSISTANT_TEXT=true
@@ -338,6 +344,27 @@ NEXT_PUBLIC_BACKGROUND_IMAGE_PATH=/backgrounds/bg-mono.svg
 # 初期挨拶
 NEXT_PUBLIC_INITIAL_GREETING_ENABLED=true
 ```
+
+必要な環境変数一覧（全 16 項目）:
+
+| カテゴリ | 変数名 | 備考 |
+|---|---|---|
+| 認証保護 | `SITE_ACCESS_SECRET` | 32byte ランダム |
+| AgentCore 連携 | `AGENTCORE_URL` | API Gateway のベース URL（末尾 `/` なし） |
+| | `AGENTCORE_API_KEY` | CDK 出力の API Key 値 |
+| | `AGENTCORE_BANK_ID` | UUID（デフォルト `00000000-0000-4000-8000-000000000001`） |
+| Blob (VRM) | `BLOB_READ_WRITE_TOKEN` | Vercel 自動注入 |
+| | `BLOB_ENCRYPTION_SECRET` | 32byte ランダム |
+| | `NEXT_PUBLIC_SELECTED_VRM_PATH` | Private Blob URL |
+| 基本 | `NEXT_PUBLIC_SELECT_LANGUAGE` | `ja` 推奨 |
+| | `NEXT_PUBLIC_CHARACTER_NAME` | 画面表示名 |
+| | `NEXT_PUBLIC_MODEL_TYPE` | `vrm` / `live2d` / `pngtuber` |
+| UI 表示 | `NEXT_PUBLIC_SHOW_ASSISTANT_TEXT` | 発話吹き出しの有無 |
+| | `NEXT_PUBLIC_SHOW_CHARACTER_NAME` | キャラ名表示の有無 |
+| | `NEXT_PUBLIC_SHOW_CONTROL_PANEL` | 操作パネル表示の有無 |
+| | `NEXT_PUBLIC_SHOW_INTRODUCTION` | 初回ダイアログ表示の有無 |
+| | `NEXT_PUBLIC_BACKGROUND_IMAGE_PATH` | 背景画像のパス |
+| 初期挨拶 | `NEXT_PUBLIC_INITIAL_GREETING_ENABLED` | 画面を開いた時の AI 生成挨拶 |
 
 > **重要**: `NEXT_PUBLIC_*` はビルド時焼き込み。変更後は必ず **Redeploy** する。
 
