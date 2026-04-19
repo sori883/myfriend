@@ -256,43 +256,6 @@ export const MessageInput = ({
     setFileError('')
   }, [])
 
-  // クリップボードからの画像ペースト処理
-  const handlePaste = useCallback(
-    async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!isMultiModalSupported) {
-        updateRowsWithDelay(event.target as HTMLTextAreaElement)
-        return
-      }
-
-      const clipboardData = event.clipboardData
-      if (!clipboardData) {
-        updateRowsWithDelay(event.target as HTMLTextAreaElement)
-        return
-      }
-
-      const items = clipboardData.items
-      let hasImage = false
-
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          event.preventDefault()
-          const file = item.getAsFile()
-          if (file) {
-            await processImageFile(file)
-            hasImage = true
-          }
-          break
-        }
-      }
-
-      // 画像がない場合のみ通常のペースト処理を実行
-      if (!hasImage) {
-        updateRowsWithDelay(event.target as HTMLTextAreaElement)
-      }
-    },
-    [isMultiModalSupported, processImageFile, updateRowsWithDelay]
-  )
-
   // ドラッグ＆ドロップ処理
   const handleDragOver = useCallback(
     (event: React.DragEvent) => {
@@ -529,12 +492,9 @@ export const MessageInput = ({
                     ? `${t('AnswerGenerating')}${loadingDots}`
                     : continuousMicListeningMode && isMicRecording
                       ? t('ListeningContinuously')
-                      : isMultiModalSupported && !isSmallScreen
-                        ? `${t('EnterYourQuestion')} (${t('PasteImageSupported') || 'Paste image supported'})`
-                        : t('EnterYourQuestion')
+                      : t('EnterYourQuestion')
                 }
                 onChange={handleTextChange}
-                onPaste={handlePaste}
                 onKeyDown={handleKeyPress}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
