@@ -2,7 +2,8 @@ import { Message } from '@/features/messages/messages'
 import { NextRequest } from 'next/server'
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
+  maxDuration: 300,
 }
 
 const UUID_REGEX =
