@@ -34,6 +34,8 @@ export interface TransientState {
   setIsCubismCoreLoaded: (loaded: boolean) => void
   isLive2dLoaded: boolean
   setIsLive2dLoaded: (loaded: boolean) => void
+  isVrmLoading: boolean
+  setIsVrmLoading: (loading: boolean) => void
   isSpeaking: boolean
   // Presence detection transient state
   presenceState: PresenceState
@@ -165,6 +167,8 @@ const homeStore = create<HomeState>()(
         set(() => ({ isCubismCoreLoaded: loaded })),
       isLive2dLoaded: false,
       setIsLive2dLoaded: (loaded) => set(() => ({ isLive2dLoaded: loaded })),
+      isVrmLoading: false,
+      setIsVrmLoading: (loading) => set(() => ({ isVrmLoading: loading })),
       isSpeaking: false,
       // Presence detection initial state
       presenceState: 'idle',
