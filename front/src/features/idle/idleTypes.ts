@@ -71,6 +71,9 @@ export interface IdleModeSettings {
   // AI generation settings (optional feature)
   idleAiGenerationEnabled: boolean
   idleAiPromptTemplate: string
+
+  // Initial greeting on page mount (AI 生成、時間帯別プロンプト流用)
+  initialGreetingEnabled: boolean
 }
 
 // Default configuration
@@ -89,6 +92,7 @@ export const DEFAULT_IDLE_CONFIG: IdleModeSettings = {
   idleTimePeriodEveningEmotion: 'relaxed',
   idleAiGenerationEnabled: false,
   idleAiPromptTemplate: '',
+  initialGreetingEnabled: false,
 }
 
 // Interval validation constants

@@ -24,6 +24,7 @@ import { MemoryServiceInitializer } from '@/components/memoryServiceInitializer'
 import toastStore from '@/features/stores/toast'
 import { usePresetLoader } from '@/features/presets/usePresetLoader'
 import { useLive2DEnabled } from '@/hooks/useLive2DEnabled'
+import { useInitialGreeting } from '@/hooks/useInitialGreeting'
 
 const Home = () => {
   const webcamStatus = homeStore((s) => s.webcamStatus)
@@ -46,6 +47,7 @@ const Home = () => {
   const characterPreset5 = settingsStore((s) => s.characterPreset5)
   const { t } = useTranslation()
   usePresetLoader()
+  useInitialGreeting()
   const characterPresets = useMemo(
     () => [
       { key: 'characterPreset1', value: characterPreset1 },

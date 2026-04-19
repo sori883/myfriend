@@ -875,6 +875,9 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_IDLE_AI_GENERATION_ENABLED === 'true' ||
     DEFAULT_IDLE_CONFIG.idleAiGenerationEnabled,
   idleAiPromptTemplate: process.env.NEXT_PUBLIC_IDLE_AI_PROMPT_TEMPLATE || '',
+  initialGreetingEnabled:
+    process.env.NEXT_PUBLIC_INITIAL_GREETING_ENABLED === 'true' ||
+    DEFAULT_IDLE_CONFIG.initialGreetingEnabled,
 
   // Kiosk mode settings
   kioskModeEnabled:
@@ -1199,6 +1202,7 @@ const settingsStore = create<SettingsState>()(
         idleTimePeriodEveningEmotion: state.idleTimePeriodEveningEmotion,
         idleAiGenerationEnabled: state.idleAiGenerationEnabled,
         idleAiPromptTemplate: state.idleAiPromptTemplate,
+        initialGreetingEnabled: state.initialGreetingEnabled,
         // Kiosk mode settings (kioskTemporaryUnlock is NOT persisted)
         kioskModeEnabled: state.kioskModeEnabled,
         kioskPasscode: state.kioskPasscode,
