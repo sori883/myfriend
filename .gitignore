@@ -44,3 +44,6 @@ lerna-debug.log*
 # misc
 .DS_Store
 .todos/
+
+# VRM models (Vercel Blob で配信するためリポジトリには含めない)
+front/public/vrm/*.vrm
