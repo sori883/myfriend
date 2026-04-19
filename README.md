@@ -27,11 +27,16 @@ graph TB
         SecretsManager["Secrets Manager"]
     end
 
+    subgraph External["外部 API"]
+        Tavily["Tavily API<br/>Web 検索"]
+    end
+
     Next -->|POST /v1| APIGW
     APIGW --> Proxy
     Proxy -->|InvokeAgentRuntime| AgentCore
     AgentCore -->|recall / retain / reflect| Aurora
     AgentCore -->|Converse API<br/>Claude Sonnet| Bedrock
+    AgentCore -->|web_search tool<br/>HTTPS| Tavily
     EventBridge --> Batch
     Batch -->|Consolidation| Aurora
     Batch -->|Claude Haiku| Bedrock
