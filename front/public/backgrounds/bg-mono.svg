@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7f7f8"/>
+      <stop offset="100%" stop-color="#eceef1"/>
+    </linearGradient>
+
+    <!-- ハート -->
+    <symbol id="heart" viewBox="0 0 24 24">
+      <path d="M12 20.5 L10.6 19.2 C6 14.8 3 12 3 8.5 C3 5.9 5 4 7.5 4 c 1.6 0 3.1 0.8 4 2 c 0.9 -1.2 2.4 -2 4 -2 C 18.5 4 20.5 5.9 20.5 8.5 c 0 3.5 -3 6.3 -7.6 10.7 Z" fill="currentColor"/>
+    </symbol>
+
+    <!-- 星（4 pt） -->
+    <symbol id="spark" viewBox="0 0 24 24">
+      <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor"/>
+    </symbol>
+
+    <!-- 花 -->
+    <symbol id="flower" viewBox="0 0 24 24">
+      <circle cx="12" cy="6" r="3.2" fill="currentColor"/>
+      <circle cx="18" cy="12" r="3.2" fill="currentColor"/>
+      <circle cx="12" cy="18" r="3.2" fill="currentColor"/>
+      <circle cx="6" cy="12" r="3.2" fill="currentColor"/>
+      <circle cx="12" cy="12" r="2.2" fill="#ffffff"/>
+    </symbol>
+
+    <!-- パターン -->
+    <pattern id="kawaii" x="0" y="0" width="240" height="240" patternUnits="userSpaceOnUse">
+      <!-- ハート群 -->
+      <use href="#heart" x="20"  y="24"  width="28" height="28" color="#111827" opacity="0.10"/>
+      <use href="#heart" x="170" y="150" width="22" height="22" color="#111827" opacity="0.08"/>
+
+      <!-- 花 -->
+      <use href="#flower" x="120" y="40"  width="34" height="34" color="#111827" opacity="0.09"/>
+      <use href="#flower" x="30"  y="170" width="26" height="26" color="#111827" opacity="0.07"/>
+
+      <!-- キラッと星 -->
+      <use href="#spark" x="90"  y="110" width="18" height="18" color="#111827" opacity="0.10"/>
+      <use href="#spark" x="200" y="60"  width="14" height="14" color="#111827" opacity="0.08"/>
+      <use href="#spark" x="180" y="210" width="12" height="12" color="#111827" opacity="0.10"/>
+
+      <!-- 小さな泡 -->
+      <circle cx="70"  cy="90"  r="2.5" fill="#111827" fill-opacity="0.12"/>
+      <circle cx="150" cy="200" r="2"   fill="#111827" fill-opacity="0.10"/>
+      <circle cx="220" cy="100" r="1.5" fill="#111827" fill-opacity="0.10"/>
+      <circle cx="50"  cy="230" r="1.5" fill="#111827" fill-opacity="0.08"/>
+      <circle cx="110" cy="170" r="1.2" fill="#111827" fill-opacity="0.10"/>
+    </pattern>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#kawaii)"/>
+</svg>
