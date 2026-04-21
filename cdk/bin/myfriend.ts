@@ -25,7 +25,7 @@ const memoryEnabled =
 // memoryEnabled=true のときだけ MemoryStack をデプロイする
 const memoryStack = memoryEnabled
   ? new MemoryStack(app, 'Memory', {
-      stackName: `${parameter.prefix}-Memory`,
+      stackName: `${parameter.prefix}-Memory3`,
       env: { account: parameter.dotEnv.ACCOUNT_ID, region: parameter.region },
       parameter,
     })
